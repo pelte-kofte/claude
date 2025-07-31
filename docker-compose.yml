@@ -1,1 +1,148 @@
  
+version: '3.8'
+
+services:
+  claude:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: claude-eczane
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      # API Keys (set these in .env file)
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      
+      # Application settings
+      - ENV=production
+      - TARGET_REGION=KARŞIYAKA 4
+      - DEBUG_MODE=false
+      - TEST_MODE=false
+      
+      # Display settings
+      - DISPLAY=${DISPLAY:-:0}
+      - QT_X11_NO_MITSHM=1
+      - HEADLESS=${HEADLESS:-false}
+      
+      # Timezone
+      - TZ=Europe/Istanbul
+    
+    # Volumes
+    volumes:
+      # Application data
+      - ./ads:/app/ads:rw
+      - ./logs:/app/logs:rw
+      - ./cache:/app/cache:rw
+      
+      # Configuration (optional)
+      - ./config_local.py:/app/config_local.py:ro
+      - ./logo.png:/app/logo.png:ro
+      
+      # X11 socket for GUI (Linux only)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      
+      # Timezone
+      - /etc/localtime:/etc/localtime:ro
+    
+    # Network
+    network_mode: host
+    
+    # Devices (for hardware acceleration)
+    devices:
+      - /dev/dri:/dev/dri  # GPU access
+    
+    # Security
+    security_opt:
+      - seccomp:unconfined
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Dependencies
+    depends_on:
+      - redis
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: claude-redis
+    restart: unless-stopped
+    
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    
+    volumes:
+      - redis_data:/data
+    
+    ports:
+      - "6379:6379"
+    
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Nginx for serving static files (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: claude-nginx
+    restart: unless-stopped
+    
+    ports:
+      - "80:80"
+      - "443:443"
+    
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ads:/usr/share/nginx/html/ads:ro
+      - ./logs:/usr/share/nginx/html/logs:ro
+    
+    depends_on:
+      - claude
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    driver: bridge
