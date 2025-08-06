@@ -1,618 +1,440 @@
 import sys
 import requests
 from bs4 import BeautifulSoup
-from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QLabel, QScrollArea, QSizePolicy, QFrame, QGraphicsDropShadowEffect,
-                             QStackedLayout)
-from PyQt5.QtGui import (QPixmap, QPainter, QPainterPath, QColor, QFont,
-                          QLinearGradient, QRadialGradient, QBrush, QPen)
-from PyQt5.QtCore import Qt, QUrl, QTimer, QTime, QSize, QRectF, QPropertyAnimation, QEasingCurve, pyqtProperty
-from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
-from PyQt5.QtMultimediaWidgets import QVideoWidget
-import os
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QSizePolicy, QStackedLayout, QFrame, QGraphicsDropShadowEffect
+from PyQt5.QtGui import QDesktopServices, QPixmap, QPainter, QPainterPath, QColor, QFont, QPen
+from PyQt5.QtCore import Qt, QUrl, QTimer, QTime, QSize, QRectF
+
+from geopy.geocoders import Nominatim 
+from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 import re
 import time
-from io import BytesIO
+import unicodedata
+import os
+from io import BytesIO 
 from urllib.parse import quote_plus
 
-try:
-    from PIL import Image
-    import qrcode
-except ImportError:
-    print("PIL ve qrcode kütüphaneleri gerekli:")
-    print("pip install Pillow qrcode")
+from PIL import Image
+import qrcode
 
-# --- API Configuration ---
-API_CONFIG = {
-    'google_maps': "AIzaSyCIG70KV9YFvAoxlbqm3LqN_dRfuWZj-eE",
-    'openweather': "b0d1be7721b4967d8feb810424bd9b6f",
-    'city': "İzmir",
-    'target_region': "KARŞIYAKA 4"
-}
+# --- API KEYS VE AYARLAR ---
+GOOGLE_MAPS_API_KEY = "AIzaSyCIG70KV9YFvAoxlbqm3LqN_dRfuWZj-eE" 
+OPENWEATHER_API_KEY = "b0d1be7721b4967d8feb810424bd9b6f" 
+OPENWEATHER_CITY = "Izmir"
+OPENWEATHER_LANG = "tr"
+OPENWEATHER_UNITS = "metric"
 
-# --- Modern Animated Widget Base ---
-class AnimatedWidget(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._opacity = 1.0
-        self.fade_animation = QPropertyAnimation(self, b"opacity")
-        
-    def get_opacity(self):
-        return self._opacity
-    
-    def set_opacity(self, opacity):
-        self._opacity = opacity
-        self.update()
-    
-    opacity = pyqtProperty(float, get_opacity, set_opacity)
-    
-    def fade_in(self, duration=1000):
-        self.fade_animation.setDuration(duration)
-        self.fade_animation.setStartValue(0.0)
-        self.fade_animation.setEndValue(1.0)
-        self.fade_animation.setEasingCurve(QEasingCurve.OutCubic)
-        self.fade_animation.start()
+# Eczane Kusdemir koordinatları (başlangıç noktası)
+ECZANE_KUSDEMIR_LAT = 38.47422 
+ECZANE_KUSDEMIR_LON = 27.11251
 
-# --- Glassmorphism Logo Component ---
-class GlassmorphismLogo(QLabel):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setFixedSize(120, 120)
+# Nominatim Geocoder
+geolocator = Nominatim(user_agent="eczane_nobet_uygulamasi_vitrin")
+
+# --- YARDIMCI FONKSİYONLAR ---
+def extract_coords_from_map_url(url):
+    """Google Maps URL'sinden koordinat çıkar"""
+    # ?q=lat,lng formatı
+    match_q = re.search(r'\?q=(-?\d+\.\d+),(-?\d+\.\d+)', url)
+    if match_q:
+        lat = float(match_q.group(1))
+        lon = float(match_q.group(2))
+        print(f"DEBUG: Koordinatlar '?q=' formatından çıkarıldı: Lat={lat}, Lon={lon}")
+        return lat, lon
+
+    # @lat,lng formatı
+    match_at = re.search(r'@(-?\d+\.\d+),(-?\d+\.\d+)', url)
+    if match_at:
+        lat = float(match_at.group(1))
+        lon = float(match_at.group(2))
+        print(f"DEBUG: Koordinatlar '@' formatından çıkarıldı: Lat={lat}, Lon={lon}")
+        return lat, lon
         
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        
-        # Outer glassmorphism ring
-        outer_gradient = QRadialGradient(60, 60, 60)
-        outer_gradient.setColorAt(0, QColor(255, 255, 255, 80))
-        outer_gradient.setColorAt(0.7, QColor(255, 255, 255, 40))
-        outer_gradient.setColorAt(1, QColor(255, 255, 255, 10))
-        
-        painter.setBrush(QBrush(outer_gradient))
-        painter.setPen(QPen(QColor(255, 255, 255, 100), 3))
-        painter.drawEllipse(5, 5, 110, 110)
-        
-        # Inner glow circle
-        inner_gradient = QRadialGradient(60, 60, 45)
-        inner_gradient.setColorAt(0, QColor(102, 126, 234, 60))
-        inner_gradient.setColorAt(0.5, QColor(118, 75, 162, 40))
-        inner_gradient.setColorAt(1, QColor(240, 147, 251, 20))
-        
-        painter.setBrush(QBrush(inner_gradient))
-        painter.setPen(Qt.NoPen)
-        painter.drawEllipse(20, 20, 80, 80)
-        
-        # Logo content area
-        if self.pixmap():
-            pix = self.pixmap()
-            scaled_pix = pix.scaled(70, 70, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-            
-            path = QPainterPath()
-            path.addEllipse(QRectF(25, 25, 70, 70))
-            painter.setClipPath(path)
-            
-            x = (120 - scaled_pix.width()) / 2
-            y = (120 - scaled_pix.height()) / 2
-            painter.drawPixmap(int(x), int(y), scaled_pix)
+    print(f"DEBUG: Harita URL'sinden koordinat çıkarılamadı: {url}")
+    return None, None
+
+def get_driving_route_polyline(origin_lat, origin_lon, dest_lat, dest_lon, api_key):
+    """Google Directions API ile rota polyline'ı al"""
+    directions_url = (
+        f"https://maps.googleapis.com/maps/api/directions/json?"
+        f"origin={origin_lat},{origin_lon}&"
+        f"destination={dest_lat},{dest_lon}&"
+        f"mode=driving&"
+        f"key={api_key}"
+    )
+    
+    try:
+        response = requests.get(directions_url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if data['status'] == 'OK' and data['routes']:
+            encoded_polyline = data['routes'][0]['overview_polyline']['points']
+            print(f"DEBUG: Directions API'den rota polyline başarıyla alındı.")
+            return encoded_polyline
         else:
-            # Default pharmacy cross icon
-            painter.setBrush(QBrush(QColor(255, 255, 255, 200)))
-            painter.setPen(Qt.NoPen)
-            # Vertical bar
-            painter.drawRoundedRect(55, 35, 10, 50, 5, 5)
-            # Horizontal bar
-            painter.drawRoundedRect(35, 55, 50, 10, 5, 5)
+            print(f"Directions API hatası: {data.get('error_message', data['status'])}")
+            return None
+    except Exception as e:
+        print(f"Directions API hatası: {e}")
+        return None
 
-# --- Modern Weather Widget ---
-class WeatherWidget(AnimatedWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.init_ui()
-        self.fade_in()
-        
-    def init_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setSpacing(8)
-        layout.setContentsMargins(15, 12, 15, 12)
-        
-        # Weather icon ve temp container
-        weather_container = QHBoxLayout()
-        weather_container.setSpacing(10)
-        
-        self.weather_icon = QLabel("🌤️")
-        self.weather_icon.setFixedSize(50, 50)
-        self.weather_icon.setAlignment(Qt.AlignCenter)
-        self.weather_icon.setFont(QFont("Segoe UI Emoji", 20))
-        self.weather_icon.setStyleSheet("""
-            QLabel {
-                background-color: #e74c3c;
-                border-radius: 25px;
-                border: 2px solid rgba(255, 255, 255, 0.3);
-            }
-        """)
-        weather_container.addWidget(self.weather_icon)
-        
-        # Temperature ve description
-        temp_layout = QVBoxLayout()
-        temp_layout.setSpacing(2)
-        
-        self.temp_label = QLabel("--°C")
-        self.temp_label.setFont(QFont("Inter", 20, QFont.Bold))
-        self.temp_label.setStyleSheet("color: #ffffff;")
-        temp_layout.addWidget(self.temp_label)
-        
-        self.desc_label = QLabel("Yükleniyor...")
-        self.desc_label.setFont(QFont("Inter", 11, QFont.Normal))
-        self.desc_label.setStyleSheet("color: rgba(255, 255, 255, 0.8);")
-        self.desc_label.setWordWrap(True)
-        temp_layout.addWidget(self.desc_label)
-        
-        weather_container.addLayout(temp_layout)
-        layout.addLayout(weather_container)
-        
-        # Last updated
-        self.updated_label = QLabel("Son Güncelleme: --")
-        self.updated_label.setFont(QFont("Inter", 10, QFont.Normal))
-        self.updated_label.setStyleSheet("""
-            color: rgba(255, 255, 255, 0.6);
-            background: rgba(255, 255, 255, 0.05);
-            padding: 4px 10px;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        """)
-        self.updated_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.updated_label)
-        
-        # Container styling
-        self.setStyleSheet("""
-            WeatherWidget {
-                background-color: rgba(255, 255, 255, 0.15);
-                border: 2px solid rgba(255, 255, 255, 0.2);
-                border-radius: 20px;
-            }
-        """)
+def get_coordinates_from_address(address, region_fallback=None):
+    """Adres için Nominatim ile koordinat al"""
+    address_attempts = [address]
+    if region_fallback and region_fallback != "Bilinmiyor":
+        address_attempts.append(f"{address}, {region_fallback}, İzmir, Türkiye")
+        if "KARŞIYAKA" in region_fallback.upper():
+            address_attempts.append(f"{address}, Karşıyaka, İzmir, Türkiye")
+        address_attempts.append(f"{address}, İzmir, Türkiye")
 
-# --- Premium Pharmacy Card ---
-class PharmacyCard(AnimatedWidget):
-    def __init__(self, pharmacy_data, parent=None):
-        super().__init__(parent)
-        self.pharmacy_data = pharmacy_data
-        self.init_ui()
-        
-    def init_ui(self):
-        self.setFixedHeight(650)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        
-        # Card styling - BEYAZ ARKA PLAN İÇİN UYARLANMIŞ
-        self.setStyleSheet("""
-            PharmacyCard {
-                background-color: rgba(231, 76, 60, 0.1);
-                border: 2px solid rgba(231, 76, 60, 0.3);
-                border-radius: 25px;
-                margin: 10px 20px 25px 20px;
-            }
-        """)
-        
-        # Shadow effect
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(25)
-        shadow.setColor(QColor(0, 0, 0, 20))
-        shadow.setOffset(0, 10)
-        self.setGraphicsEffect(shadow)
-        
-        # Info section
-        info_section = self.create_info_section()
-        layout.addWidget(info_section)
-        
-        # Map section
-        if self.pharmacy_data.get('lat_long'):
-            map_section = self.create_map_section()
-            layout.addWidget(map_section)
-    
-    def create_info_section(self):
-        section = QWidget()
-        section.setFixedHeight(240)
-        layout = QHBoxLayout(section)
-        layout.setContentsMargins(30, 25, 30, 20)
-        layout.setSpacing(25)
-        
-        # Left: Pharmacy information
-        info_widget = QWidget()
-        info_layout = QVBoxLayout(info_widget)
-        info_layout.setSpacing(12)
-        info_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Pharmacy name - BEYAZ ARKA PLAN İÇİN SİYAH METİN
-        name_label = QLabel(self.pharmacy_data.get('adi', 'Bilinmeyen Eczane'))
-        name_label.setFont(QFont("Inter", 24, QFont.Bold))
-        name_label.setStyleSheet("""
-            color: #ffffff;
-            background: #e74c3c;
-            padding: 12px 18px;
-            border-radius: 12px;
-            border: 2px solid rgba(231, 76, 60, 0.8);
-        """)
-        name_label.setWordWrap(True)
-        info_layout.addWidget(name_label)
-        
-        # Address - BEYAZ ARKA PLAN İÇİN UYARLANMIŞ
-        address_text = self.pharmacy_data.get('adres', 'Adres bilgisi mevcut değil')
-        address_label = QLabel(f"📍 {address_text}")
-        address_label.setFont(QFont("Inter", 14, QFont.Normal))
-        address_label.setStyleSheet("""
-            color: #2c3e50;
-            background: rgba(231, 76, 60, 0.1);
-            padding: 10px 15px;
-            border-radius: 15px;
-            border: 1px solid rgba(231, 76, 60, 0.3);
-        """)
-        address_label.setWordWrap(True)
-        info_layout.addWidget(address_label)
-        
-        # Phone - BEYAZ ARKA PLAN İÇİN UYARLANMIŞ
-        phone_text = self.pharmacy_data.get('telefon', 'Telefon bilgisi mevcut değil')
-        phone_label = QLabel(f"📞 {phone_text}")
-        phone_label.setFont(QFont("Inter", 14, QFont.Normal))
-        phone_label.setStyleSheet("""
-            color: #2c3e50;
-            background: rgba(231, 76, 60, 0.1);
-            padding: 8px 12px;
-            border-radius: 10px;
-            border: 1px solid rgba(231, 76, 60, 0.2);
-        """)
-        phone_label.setWordWrap(True)
-        info_layout.addWidget(phone_label)
-        
-        layout.addWidget(info_widget, 3)
-        
-        # Right: QR Code
-        qr_widget = self.create_qr_widget()
-        layout.addWidget(qr_widget, 0)
-        
-        return section
-    
-    def create_qr_widget(self):
-        qr_container = QWidget()
-        qr_container.setFixedSize(130, 130)
-        
-        qr_layout = QVBoxLayout(qr_container)
-        qr_layout.setContentsMargins(0, 0, 0, 0)
-        
-        qr_label = QLabel()
-        qr_label.setFixedSize(130, 130)
-        qr_label.setAlignment(Qt.AlignCenter)
-        
-        # Generate QR code - GERÇEK LOKASYON İLE
-        lat_long = self.pharmacy_data.get('lat_long')
-        if lat_long and 'qrcode' in sys.modules:
-            try:
-                # Google Maps linki - gerçek lokasyon
-                qr_url = f"https://www.google.com/maps/search/?api=1&query={lat_long}"
-                print(f"🗺️ QR kod oluşturuluyor: {qr_url}")
-                
-                qr_img = qrcode.QRCode(
-                    version=1,
-                    error_correction=qrcode.constants.ERROR_CORRECT_L,
-                    box_size=6,
-                    border=2,
-                )
-                qr_img.add_data(qr_url)
-                qr_img.make(fit=True)
-                
-                qr_pil_img = qr_img.make_image(fill_color="white", back_color="transparent")
-                
-                byte_array = BytesIO()
-                qr_pil_img.save(byte_array, format="PNG")
-                
-                qr_pixmap = QPixmap()
-                qr_pixmap.loadFromData(byte_array.getvalue())
-                
-                qr_label.setPixmap(qr_pixmap.scaled(110, 110, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-                
-            except Exception as e:
-                print(f"❌ QR kod hatası: {e}")
-                qr_label.setText("QR\nKOD\nHATASI")
-                qr_label.setStyleSheet("color: #2c3e50; font-size: 12px; font-weight: bold;")
-        else:
-            qr_label.setText("🗺️\nHARİTA\nLİNKİ")
-            qr_label.setStyleSheet("color: #2c3e50; font-size: 14px; font-weight: bold;")
-        
-        # QR container styling - BEYAZ ARKA PLAN İÇİN UYARLANMIŞ
-        qr_container.setStyleSheet("""
-            QWidget {
-                background-color: rgba(231, 76, 60, 0.15);
-                border: 2px solid rgba(231, 76, 60, 0.4);
-                border-radius: 18px;
-            }
-        """)
-        
-        qr_layout.addWidget(qr_label)
-        return qr_container
-    
-    def create_map_section(self):
-        map_widget = QWidget()
-        map_widget.setFixedHeight(385)
-        
-        layout = QVBoxLayout(map_widget)
-        layout.setContentsMargins(20, 5, 20, 15)
-        
-        map_label = QLabel()
-        map_label.setFixedHeight(355)
-        map_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        
-        # Generate map - GERÇEK LOKASYON İLE
-        lat_long = self.pharmacy_data.get('lat_long')
-        if lat_long:
-            try:
-                print(f"🗺️ Harita oluşturuluyor: {lat_long}")
-                
-                map_url_parts = [
-                    f"https://maps.googleapis.com/maps/api/staticmap?",
-                    f"center={lat_long}&zoom=16&size=920x355&scale=2&",
-                    f"style=feature:all|element:geometry|color:0x2c3e50&",
-                    f"style=feature:all|element:labels.text.fill|color:0xffffff&",
-                    f"style=feature:all|element:labels.text.stroke|color:0x2c3e50&",
-                    f"style=feature:landscape|element:geometry|color:0x34495e&",
-                    f"style=feature:poi|element:geometry|color:0x3498db&",
-                    f"style=feature:road|element:geometry|color:0x7f8c8d&",
-                    f"style=feature:water|element:geometry|color:0x2980b9&",
-                    f"markers=color:0xe74c3c%7Csize:mid%7Clabel:E%7C{lat_long}&",
-                    f"key={API_CONFIG['google_maps']}"
-                ]
-                
-                map_url = "".join(map_url_parts)
-                
-                response = requests.get(map_url, stream=True, timeout=15)
-                response.raise_for_status()
-                
-                pixmap = QPixmap()
-                pixmap.loadFromData(response.content)
-                
-                if not pixmap.isNull():
-                    # Rounded corners
-                    rounded_pixmap = QPixmap(pixmap.size())
-                    rounded_pixmap.fill(Qt.transparent)
-                    
-                    painter = QPainter(rounded_pixmap)
-                    painter.setRenderHint(QPainter.Antialiasing)
-                    
-                    path = QPainterPath()
-                    path.addRoundedRect(QRectF(rounded_pixmap.rect()), 15, 15)
-                    painter.setClipPath(path)
-                    painter.drawPixmap(0, 0, pixmap)
-                    painter.end()
-                    
-                    map_label.setPixmap(rounded_pixmap.scaled(
-                        QSize(900, 355), 
-                        Qt.KeepAspectRatio, 
-                        Qt.SmoothTransformation
-                    ))
-                    map_label.setAlignment(Qt.AlignCenter)
-                    
-                    # Map styling - BEYAZ ARKA PLAN İÇİN UYARLANMIŞ
-                    map_label.setStyleSheet("""
-                        QLabel {
-                            background: rgba(231, 76, 60, 0.05);
-                            border: 2px solid rgba(231, 76, 60, 0.2);
-                            border-radius: 15px;
-                        }
-                    """)
-                else:
-                    self.show_map_error(map_label)
-                    
-            except Exception as e:
-                print(f"Map generation error: {e}")
-                self.show_map_error(map_label)
-        else:
-            self.show_map_error(map_label)
-        
-        layout.addWidget(map_label)
-        return map_widget
-    
-    def show_map_error(self, map_label):
-        map_label.setText("🗺️ KONUM BİLGİSİ\n\nHarita yüklenemedi")
-        map_label.setAlignment(Qt.AlignCenter)
-        map_label.setFont(QFont("Inter", 16, QFont.Bold))
-        map_label.setStyleSheet("""
-            QLabel {
-                color: #2c3e50;
-                background-color: rgba(231, 76, 60, 0.1);
-                border: 2px solid rgba(231, 76, 60, 0.3);
-                border-radius: 20px;
-                padding: 25px;
-            }
-        """)
+    # Adres temizleme
+    simplified_address = re.sub(r'\bNO:\s*\d+[/\s\w]*\b', '', address, flags=re.IGNORECASE).strip()
+    simplified_address = re.sub(r'\s*\(.*\)$', '', simplified_address).strip()
 
-# --- Modern Header Component ---
-class ModernHeader(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.init_ui()
-        
-    def init_ui(self):
-        self.setFixedHeight(180)
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(30, 20, 30, 20)
-        layout.setSpacing(25)
-        
-        # Logo yükleme - farklı dosya isimleri dene
-        self.logo = GlassmorphismLogo()
-        
-        # Olası logo dosya yolları
-        logo_paths = [
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.jpg"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.jpeg"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "eczane_logo.png"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "eczane.png"),
-            "logo.png",
-            "logo.jpg",
-            "eczane_logo.png"
-        ]
-        
-        logo_loaded = False
-        for logo_path in logo_paths:
-            if os.path.exists(logo_path):
-                try:
-                    logo_pixmap = QPixmap(logo_path)
-                    if not logo_pixmap.isNull():
-                        self.logo.setPixmap(logo_pixmap)
-                        print(f"✅ Logo yüklendi: {logo_path}")
-                        logo_loaded = True
-                        break
-                except Exception as e:
-                    print(f"❌ Logo yüklenirken hata ({logo_path}): {e}")
-                    continue
-        
-        if not logo_loaded:
-            print("⚠️ Logo dosyası bulunamadı. Varsayılan eczane logosu kullanılıyor.")
-            print("📋 Desteklenen dosya isimleri:")
-            for path in logo_paths:
-                print(f"   - {os.path.basename(path)}")
+    if simplified_address != address and simplified_address:
+        address_attempts.append(f"{simplified_address}, İzmir, Türkiye")
+    
+    # Unique attempts
+    seen = set()
+    unique_attempts = []
+    for item in address_attempts:
+        if item not in seen:
+            seen.add(item)
+            unique_attempts.append(item)
+
+    for attempt_address in unique_attempts:
+        time.sleep(0.5)
+        try:
+            print(f"DEBUG: Nominatim ile adres denemesi: '{attempt_address}'")
+            location = geolocator.geocode(attempt_address, timeout=10)
+            if location:
+                print(f"DEBUG: Nominatim'den koordinatlar alındı: Lat={location.latitude}, Lon={location.longitude}")
+                return {"lat": location.latitude, "lon": location.longitude}
+        except Exception as e:
+            print(f"DEBUG: Nominatim hatası: {e}")
+            time.sleep(1)
+
+    print(f"DEBUG: Nominatim ile koordinat bulunamadı: '{address}'")
+    return {"lat": None, "lon": None}
+
+def fetch_and_process_data(url="https://www.izmireczaciodasi.org.tr/nobetci-eczaneler", target_bolge="KARŞIYAKA 4"):
+    """Eczane verilerini çek ve işle"""
+    print("🔍 Veri güncelleniyor...")
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Website çekilemedi: {e}")
+        return None
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+    all_eczane_elements = soup.find_all('div', class_='col_12_of_12')
+
+    if not all_eczane_elements:
+        print("❌ Eczane elementleri bulunamadı")
+        return None
+
+    filtered_eczane_data = []
+
+    for i, element in enumerate(all_eczane_elements):
+        eczane_name = "Unknown"
+        eczane_region = "Unknown"
+        address_full_text = "Adres bulunamadı"
+        phone = "Telefon bulunamadı"
+        map_url = "Harita bulunamadı"
+        coordinates = {"lat": None, "lon": None}
+
+        # Eczane adı ve bölge parse et
+        name_element = element.find('h4', class_='red')
+        if name_element and name_element.find('strong'):
+            full_name_and_bolge = name_element.find('strong').text.strip()
+            name_region_match = re.search(r'^(.*?)\s*-\s*(.+)$', full_name_and_bolge)
+            if name_region_match:
+                eczane_name = name_region_match.group(1).strip()
+                eczane_region = name_region_match.group(2).upper().strip()
+            else:
+                eczane_name = full_name_and_bolge
+                region_match_fallback = re.search(r'(KARŞIYAKA\s*\d+|BUCA\s*\d+|BORNOVA\s*\d+|ALİAĞA|ÇİĞLİ\s*\d+|\bİZMİR\b)', 
+                                                 full_name_and_bolge, re.IGNORECASE)
+                if region_match_fallback:
+                    eczane_region = region_match_fallback.group(0).upper().strip()
+
+        # Bölge filtresi
+        if target_bolge and eczane_region != target_bolge:
+            continue
+
+        # Adres, telefon ve harita bilgileri
+        p_tag = element.find('p')
+        if p_tag:
+            full_p_html = str(p_tag)
             
-        layout.addWidget(self.logo)
-        
-        # Title section
-        title_layout = QVBoxLayout()
-        title_layout.setSpacing(5)
-        
-        self.title_label = QLabel("NÖBETÇİ ECZANELER")
-        self.title_label.setFont(QFont("Inter", 32, QFont.Bold))
-        self.title_label.setStyleSheet("color: #ffffff; background: transparent;")
-        title_layout.addWidget(self.title_label)
-        
-        self.subtitle_label = QLabel("KARŞIYAKA 4")
-        self.subtitle_label.setFont(QFont("Inter", 18, QFont.Medium))
-        self.subtitle_label.setStyleSheet("""
-            color: rgba(255, 255, 255, 0.8);
-            background: rgba(255, 255, 255, 0.1);
-            padding: 6px 15px;
-            border-radius: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        """)
-        title_layout.addWidget(self.subtitle_label)
-        
-        layout.addLayout(title_layout)
-        layout.addStretch()
-        
-        # Weather widget
-        self.weather_widget = WeatherWidget()
-        self.weather_widget.setFixedWidth(250)
-        layout.addWidget(self.weather_widget)
-        
-        # Header styling - GRİ SİYAH ARKA PLAN
-        self.setStyleSheet("ModernHeader { background-color: #2c3e50; border: none; }")
+            # Adres çıkar
+            address_match = re.search(r'<i class=\'fa fa-home main-color\'></i>\s*(.*?)(?=<br\s*/>\s*<i class=\'fa fa-(arrow-right|phone|map-marker|print) main-color\'></i>|$)', 
+                                    full_p_html, re.DOTALL)
+            if address_match:
+                address_full_text = address_match.group(1).strip()
+                address_full_text = address_full_text.replace('<br />', ' ').replace('<br/>', ' ').strip()
+                address_full_text = re.sub(r'\s+', ' ', address_full_text).strip()
+            else:
+                first_text_node = next((s for s in p_tag.contents if isinstance(s, str) and s.strip()), None)
+                if first_text_node:
+                    address_full_text = first_text_node.strip()
+                    address_full_text = re.sub(r'\s+', ' ', address_full_text).strip()
 
-# --- Modern Pharmacy Screen ---
+            # Telefon çıkar
+            phone_link = p_tag.find('a', href=re.compile(r'tel:'))
+            if phone_link:
+                phone = phone_link.text.strip()
+            else:
+                phone_match_fallback = re.search(r'(\b0?\d{10}\b|\b\d{7}\b)', p_tag.get_text(strip=True))
+                if phone_match_fallback:
+                    phone = phone_match_fallback.group(0)
+
+            # Harita URL çıkar
+            map_link_element = p_tag.find('a', title=re.compile(r'Harita Konumu', re.IGNORECASE))
+            if map_link_element:
+                map_url = map_link_element['href'].strip()
+            else:
+                map_link_element_alt = p_tag.find('a', string=re.compile(r'Eczaneyi haritada görüntülemek için tıklayınız', re.IGNORECASE))
+                if map_link_element_alt:
+                    map_url = map_link_element_alt['href'].strip()
+
+        print(f"\n--- Eczane: {eczane_name} ({eczane_region}) ---")
+        print(f"📍 Adres: '{address_full_text}'")
+        print(f"🗺️ Harita URL: '{map_url}'")
+
+        # Koordinat çıkar
+        if map_url != "Harita bulunamadı":
+            lat, lon = extract_coords_from_map_url(map_url)
+            if lat is not None and lon is not None:
+                coordinates = {"lat": lat, "lon": lon}
+        
+        # Nominatim ile koordinat al
+        if coordinates["lat"] is None and address_full_text != "Adres bulunamadı":
+            print(f"🌍 Nominatim ile koordinat deneniyor...")
+            nominatim_coords = get_coordinates_from_address(address_full_text, eczane_region)
+            if nominatim_coords["lat"] is not None:
+                coordinates = nominatim_coords
+
+        filtered_eczane_data.append({
+            'name': eczane_name,
+            'address': address_full_text,
+            'phone': phone,
+            'region': eczane_region,
+            'map_url': map_url,
+            'coordinates': coordinates
+        })
+        print(f"✅ Koordinatlar: {coordinates}")
+    
+    return filtered_eczane_data
+
+# --- ANA EKRAN SINIFI ---
 class NobetciEczaneScreen(QWidget):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.target_display_region = "KARŞIYAKA 4"
+        self.all_pharmacies = []
         self.init_ui_screen()
-        self.setup_timers()
-        
-        # Load data automatically
-        QTimer.singleShot(500, self.load_data)
-        
+        self.load_data()
+        self.fetch_weather_data()
+
+        # Timer'lar
+        self.data_refresh_timer = QTimer(self)
+        self.data_refresh_timer.timeout.connect(self.load_data)
+        self.data_refresh_timer.start(3600000)  # 1 saat
+
+        self.time_update_timer = QTimer(self)
+        self.time_update_timer.timeout.connect(self.update_time_label)
+        self.time_update_timer.start(1000)  # 1 saniye
+
+        self.weather_update_timer = QTimer(self)
+        self.weather_update_timer.timeout.connect(self.fetch_weather_data)
+        self.weather_update_timer.start(900000)  # 15 dakika
+
     def init_ui_screen(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
-        # Header
-        self.header = ModernHeader()
-        main_layout.addWidget(self.header)
+        # Header widget
+        header_widget = QWidget()
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        header_widget.setStyleSheet(f"""
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #1a1a1a, stop:1 #0f0f0f);
+            padding: 30px 40px;
+            border-bottom: 2px solid qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 #333333, stop:0.5 #555555, stop:1 #333333);
+        """)
+
+        # Logo placeholder
+        self.logo_label = QLabel("🏥")
+        self.logo_label.setStyleSheet("""
+            QLabel {
+                font-size: 80px;
+                color: #4CAF50;
+                background-color: #333333;
+                border-radius: 60px;
+                padding: 20px;
+                border: 2px solid #555555;
+            }
+        """)
+        self.logo_label.setFixedSize(120, 120)
+        self.logo_label.setAlignment(Qt.AlignCenter)
         
-        # Scroll area
+        header_layout.addWidget(self.logo_label)
+
+        # Title container
+        title_container = QVBoxLayout()
+        
+        self.title_label = QLabel("Nöbetçi Eczaneler")
+        title_font = QFont("Inter", 48, QFont.DemiBold)
+        self.title_label.setFont(title_font)
+        self.title_label.setStyleSheet("""
+            color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 #ffffff, stop:1 #cccccc); 
+            text-align: left; 
+            padding-left: 30px;
+            font-weight: 500;
+        """)
+        title_container.addWidget(self.title_label)
+
+        self.subtitle_label = QLabel(f"{self.target_display_region}")
+        subtitle_font = QFont("Inter", 26, QFont.Normal)
+        self.subtitle_label.setFont(subtitle_font)
+        self.subtitle_label.setStyleSheet("""
+            color: #FFFFFF;
+            padding-left: 30px;
+            margin-top: 8px;
+            font-weight: 400;
+        """)
+        title_container.addWidget(self.subtitle_label)
+        title_container.setSpacing(5)
+
+        header_layout.addLayout(title_container)
+        header_layout.addStretch(1)
+
+        # Hava durumu ve saat
+        self.weather_time_layout = QVBoxLayout()
+        self.weather_time_layout.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        self.weather_icon_text_layout = QHBoxLayout()
+        self.weather_icon_text_layout.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.weather_icon_text_layout.setSpacing(15)
+
+        # Hava durumu ikonu
+        self.weather_icon_label = QLabel()
+        self.weather_icon_label.setFixedSize(90, 90)
+        self.weather_icon_label.setAlignment(Qt.AlignCenter)
+        self.weather_icon_label.setStyleSheet("""
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 #444444, stop:1 #333333); 
+            border-radius: 45px;
+            border: 2px solid #666666;
+        """)
+
+        self.weather_icon_text_layout.addWidget(self.weather_icon_label)
+
+        # Hava durumu metni
+        self.weather_text_label = QLabel("Yükleniyor...")
+        weather_font = QFont("Inter", 24, QFont.Light)
+        self.weather_text_label.setFont(weather_font)
+        self.weather_text_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.weather_text_label.setStyleSheet("""
+            color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 #ffffff, stop:1 #dddddd);
+            font-weight: 300;
+        """)
+        self.weather_text_label.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Preferred)
+        self.weather_icon_text_layout.addWidget(self.weather_text_label)
+
+        self.weather_time_layout.addLayout(self.weather_icon_text_layout)
+
+        # Son güncelleme
+        self.last_updated_label = QLabel("Son Güncelleme: Yükleniyor...")
+        time_font = QFont("Inter", 18, QFont.Light)
+        self.last_updated_label.setFont(time_font)
+        self.last_updated_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.last_updated_label.setStyleSheet("""
+            color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 #999999, stop:1 #777777);
+            font-weight: 200;
+        """)
+        self.weather_time_layout.addWidget(self.last_updated_label)
+
+        header_layout.addLayout(self.weather_time_layout)
+        main_layout.addWidget(header_widget)
+
+        # Scroll Area
         self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_content_widget = QWidget()
         self.scroll_layout = QVBoxLayout(self.scroll_content_widget)
         self.scroll_layout.setAlignment(Qt.AlignTop)
-        self.scroll_layout.setContentsMargins(0, 30, 0, 50)
-        self.scroll_layout.setSpacing(0)
+        self.scroll_layout.setContentsMargins(30, 40, 30, 40)
         self.scroll_area.setWidget(self.scroll_content_widget)
         
-        # Scroll styling - BEYAZ ARKA PLAN
-        self.scroll_area.setStyleSheet("""
-            QScrollArea {
-                background-color: #ffffff;
-                border: none;
-            }
-            QScrollBar:vertical {
-                background-color: rgba(0, 0, 0, 0.1);
-                width: 14px;
-                border-radius: 7px;
-                margin: 0px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #e74c3c;
-                border-radius: 7px;
-                min-height: 35px;
-                border: 2px solid rgba(255, 255, 255, 0.2);
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: #c0392b;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-            }
-        """)
-        
         main_layout.addWidget(self.scroll_area)
-        
-        # Main background - BEYAZ
-        self.setStyleSheet("NobetciEczaneScreen { background-color: #ffffff; }")
 
-    def setup_timers(self):
-        # Data refresh timer (2 hours)
-        self.data_refresh_timer = QTimer(self)
-        self.data_refresh_timer.timeout.connect(self.load_data)
-        self.data_refresh_timer.start(7200000)
-
-        # Time update timer
-        self.time_update_timer = QTimer(self)
-        self.time_update_timer.timeout.connect(self.update_time_label)
-        self.time_update_timer.start(1000)
-
-        # Weather update timer (15 minutes)
-        self.weather_update_timer = QTimer(self)
-        self.weather_update_timer.timeout.connect(self.fetch_weather_data)
-        self.weather_update_timer.start(900000)
-        
-        # Load weather immediately
-        QTimer.singleShot(1000, self.fetch_weather_data)
+        # Ana stil
+        self.setStyleSheet(f"""
+            QWidget {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0a0a0a, stop:1 #000000);
+            }}
+            QScrollArea {{
+                border: none;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0a0a0a, stop:1 #000000);
+            }}
+            QScrollBar:vertical {{
+                border: none;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #1a1a1a, stop:1 #222222);
+                width: 12px;
+                border-radius: 6px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #444444, stop:0.5 #555555, stop:1 #444444);
+                border-radius: 6px;
+                min-height: 30px;
+                border: 1px solid #666666;
+            }}
+        """)
 
     def update_time_label(self):
-        current_time = time.strftime('%d.%m.%Y %H:%M:%S')
-        self.header.weather_widget.updated_label.setText(f"Son Güncelleme: {current_time}")
+        """Saat güncelle"""
+        self.last_updated_label.setText(f"Son Güncelleme: {time.strftime('%d.%m.%Y %H:%M:%S')}")
 
-    def get_weather_color(self, temp):
+    def get_weather_info(self, temp):
+        """Sıcaklığa göre renk"""
         if temp >= 30:
-            return "#ef4444"  # Hot red
+            return "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #FF5733, stop:1 #FFC300)"
         elif 20 <= temp < 30:
-            return "#f59e0b"  # Warm orange
+            return "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #FFBD33, stop:1 #DBFF33)"
         elif 10 <= temp < 20:
-            return "#3b82f6"  # Cool blue
+            return "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #33FFBD, stop:1 #3399FF)"
         elif 0 <= temp < 10:
-            return "#8b5cf6"  # Cold purple
+            return "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #3366FF, stop:1 #6633FF)"
         else:
-            return "#6b7280"  # Very cold gray
+            return "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #6633FF, stop:1 #CC33FF)"
 
     def fetch_weather_data(self):
-        if not API_CONFIG['openweather']:
-            self.header.weather_widget.temp_label.setText("API Eksik")
-            self.header.weather_widget.desc_label.setText("API anahtarı gerekli")
+        """OpenWeatherMap'ten hava durumu al"""
+        if not OPENWEATHER_API_KEY:
+            self.weather_text_label.setText("API Key Eksik!")
             return
 
         weather_url = (
             f"http://api.openweathermap.org/data/2.5/weather?"
-            f"q={API_CONFIG['city']}&"
-            f"appid={API_CONFIG['openweather']}&"
-            f"units=metric&"
-            f"lang=tr"
+            f"q={OPENWEATHER_CITY}&"
+            f"appid={OPENWEATHER_API_KEY}&"
+            f"units={OPENWEATHER_UNITS}&"
+            f"lang={OPENWEATHER_LANG}"
         )
         
         try:
@@ -629,470 +451,429 @@ class NobetciEczaneScreen(QWidget):
                     temp = main_data.get('temp')
 
                     if temp is not None:
-                        icon_color = self.get_weather_color(temp)
+                        icon_color = self.get_weather_info(temp)
                         
-                        self.header.weather_widget.temp_label.setText(f"{temp:.1f}°C")
-                        self.header.weather_widget.desc_label.setText(weather_desc.capitalize())
-                        self.header.weather_widget.weather_icon.setStyleSheet(f"""
-                            QLabel {{
-                                background-color: {icon_color};
-                                border-radius: 25px;
-                                border: 2px solid rgba(255, 255, 255, 0.3);
-                            }}
+                        self.weather_text_label.setText(f"{temp:.1f}°C\n{weather_desc.capitalize()}")
+                        self.weather_icon_label.setStyleSheet(f"""
+                            background: {icon_color}; 
+                            border-radius: 45px;
+                            border: 2px solid #666666;
                         """)
                         
-                        print(f"🌤️ Weather updated: {API_CONFIG['city']} - {temp:.1f}°C")
+                        print(f"✅ Hava durumu güncellendi: {OPENWEATHER_CITY} - {temp:.1f}°C")
                     else:
-                        self.header.weather_widget.temp_label.setText("--°C")
-                        self.header.weather_widget.desc_label.setText("Veri eksik")
+                        self.weather_text_label.setText("Sıcaklık bilgisi eksik!")
                 else:
-                    self.header.weather_widget.temp_label.setText("--°C")
-                    self.header.weather_widget.desc_label.setText("Veri hatası")
+                    self.weather_text_label.setText("Hava durumu bilgisi eksik!")
             else:
-                self.header.weather_widget.temp_label.setText("--°C")
-                self.header.weather_widget.desc_label.setText("Bağlantı hatası")
-                
+                self.weather_text_label.setText(f"Veri alınamadı: {weather_data.get('message', 'Bilinmeyen hata')}")
         except Exception as e:
-            self.header.weather_widget.temp_label.setText("--°C")
-            self.header.weather_widget.desc_label.setText("Ağ hatası")
-            print(f"🌤️ Weather error: {e}")
+            self.weather_text_label.setText("Bağlantı Hatası!")
+            print(f"❌ Hava durumu hatası: {e}")
 
     def load_data(self):
-        print("🔄 Loading modern pharmacy data...")
-        self.header.weather_widget.updated_label.setText("Veriler yükleniyor...")
+        """Eczane verilerini yükle"""
+        print("📊 Veriler yükleniyor...")
+        self.last_updated_label.setText("Son Güncelleme: Veri çekiliyor...")
         QApplication.processEvents()
 
-        # Clear existing cards
-        self.clear_layout(self.scroll_layout)
-        
-        # Loading widget
-        loading_widget = QWidget()
-        loading_widget.setFixedHeight(400)
-        loading_layout = QVBoxLayout(loading_widget)
-        loading_layout.setAlignment(Qt.AlignCenter)
-        
-        loading_label = QLabel("🔄 NÖBETÇİ ECZANE VERİLERİ YÜKLENİYOR...")
-        loading_label.setFont(QFont("Inter", 28, QFont.Bold))
-        loading_label.setAlignment(Qt.AlignCenter)
-        loading_label.setStyleSheet("""
-            color: #ffffff;
-            background: rgba(52, 152, 219, 0.8);
-            padding: 50px;
-            border: 3px solid rgba(52, 152, 219, 0.9);
-            border-radius: 25px;
-            margin: 40px;
-        """)
-        loading_layout.addWidget(loading_label)
-        
-        progress_label = QLabel("Lütfen bekleyiniz...")
-        progress_label.setFont(QFont("Inter", 18, QFont.Normal))
-        progress_label.setAlignment(Qt.AlignCenter)
-        progress_label.setStyleSheet("color: #ffffff; background: transparent; padding: 20px;")
-        loading_layout.addWidget(progress_label)
-        
-        self.scroll_layout.addWidget(loading_widget)
-        QApplication.processEvents()
+        # Eski kartları temizle
+        while self.scroll_layout.count():
+            item = self.scroll_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
 
-        # Load pharmacy data
-        try:
-            pharmacy_list = self.scrape_eczane_data(API_CONFIG['target_region'])
-            
-            # Clear loading
-            self.clear_layout(self.scroll_layout)
-            
-            if pharmacy_list:
-                self.display_pharmacies(pharmacy_list)
-                print(f"✅ Loaded {len(pharmacy_list)} pharmacies successfully!")
-            else:
-                print("❌ No pharmacy data found, showing sample data...")
-                sample_data = self.get_sample_pharmacy_data()
-                self.display_pharmacies(sample_data)
-                
-        except Exception as e:
-            print(f"❌ Error loading data: {e}")
-            self.clear_layout(self.scroll_layout)
-            self.show_error_message()
-            
-    def scrape_eczane_data(self, region):
-        """Get real pharmacy data from İzmir Eczacı Odası"""
-        try:
-            url = "https://www.izmireczaciodasi.org.tr/nobetci-eczaneler"
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-            
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-            
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            pharmacy_list = []
-            eczane_elements = soup.find_all('div', class_='col_12_of_12')
-            
-            if not eczane_elements:
-                print("⚠️ No pharmacy elements found, using sample data")
-                return self.get_sample_pharmacy_data()
-            
-            for element in eczane_elements:
-                try:
-                    name_element = element.find('h4', class_='red')
-                    if not name_element:
-                        continue
-                        
-                    full_name = name_element.get_text(strip=True)
-                    
-                    # Filter for KARŞIYAKA 4 only
-                    if "KARŞIYAKA 4" not in full_name.upper():
-                        continue
-                    
-                    # Split name and region
-                    if " - " in full_name:
-                        eczane_name, bolge = full_name.split(" - ", 1)
-                    else:
-                        eczane_name = full_name
-                        bolge = "KARŞIYAKA 4"
-                    
-                    # Get address and phone
-                    p_element = element.find('p')
-                    if not p_element:
-                        continue
-                    
-                    p_text = p_element.get_text(separator=' | ', strip=True)
-                    
-                    # Parse address and phone
-                    adres = "Adres bilgisi bulunamadı"
-                    telefon = "Telefon bilgisi bulunamadı"
-                    
-                    parts = p_text.split(' | ')
-                    if len(parts) >= 2:
-                        adres = parts[0].strip()
-                        telefon = parts[1].strip() if len(parts) > 1 else "Bulunamadı"
-                    
-                    # Gerçek adresi koordinata çevir
-                    coords = self.get_coordinates_from_address(adres, bolge)
-                    
-                    pharmacy = {
-                        "adi": eczane_name.strip().replace("  ", " "),
-                        "adres": adres,
-                        "telefon": telefon,
-                        "lat_long": coords  # Gerçek koordinat
-                    }
-                    
-                    pharmacy_list.append(pharmacy)
-                    print(f"  ✅ Found: {eczane_name}")
-                    
-                except Exception as e:
-                    print(f"  ❌ Error parsing pharmacy element: {e}")
-                    continue
-            
-            if pharmacy_list:
-                print(f"🎉 Found {len(pharmacy_list)} pharmacy(s) in KARŞIYAKA 4!")
-                return pharmacy_list
-            else:
-                print("⚠️ No KARŞIYAKA 4 pharmacies found, using sample data")
-                return self.get_sample_pharmacy_data()
-                
-        except Exception as e:
-            print(f"❌ Error fetching real data: {e}")
-            print("⚠️ Falling back to sample data")
-            return self.get_sample_pharmacy_data()
-    
-    def get_sample_pharmacy_data(self):
-        """Sample pharmacy data for Karşıyaka 4 region only"""
-        print("📋 Generating KARŞIYAKA 4 pharmacy data...")
-        return [
-            {
-                "adi": "💊 NÖBETÇI MERKEZ ECZANESİ",
-                "adres": "Atatürk Caddesi No:123, Karşıyaka 4 Bölgesi/İzmir",
-                "telefon": "0232 123 45 67",
-                "lat_long": "38.4642,27.1285"  # KARŞIYAKA 4 doğru koordinat
-            }
-        ]
+        # Veriyi çek
+        self.all_pharmacies = fetch_and_process_data(target_bolge=self.target_display_region)
 
-    def show_error_message(self):
-        print("❌ Showing error message...")
-        error_widget = QWidget()
-        error_widget.setFixedHeight(250)
-        error_layout = QVBoxLayout(error_widget)
-        error_layout.setAlignment(Qt.AlignCenter)
-        
-        error_label = QLabel("⚠️ Veri Yüklenemedi\n\nSample veriler gösteriliyor")
-        error_label.setFont(QFont("Inter", 28, QFont.Bold))
-        error_label.setAlignment(Qt.AlignCenter)
-        error_label.setStyleSheet("""
-            color: #ffffff;
-            background-color: rgba(231, 76, 60, 0.3);
-            padding: 40px;
-            border: 3px solid rgba(231, 76, 60, 0.6);
-            border-radius: 25px;
-            margin: 50px;
-        """)
-        
-        error_layout.addWidget(error_label)
-        self.scroll_layout.addWidget(error_widget)
-        
-        # Show sample data after 2 seconds
-        QTimer.singleShot(2000, lambda: self.display_pharmacies(self.get_sample_pharmacy_data()))
+        if self.all_pharmacies:
+            self.display_pharmacies()
+            print(f"✅ Veri yüklendi. {len(self.all_pharmacies)} eczane bulundu.")
+        else:
+            print("❌ Veri yüklenemedi")
+            error_label = QLabel("Nöbetçi eczane bilgileri yüklenemedi\n\nİnternet bağlantınızı kontrol edin")
+            error_label.setAlignment(Qt.AlignCenter)
+            error_label.setStyleSheet("""
+                color: #888888;
+                padding: 80px;
+                font-size: 32px;
+                font-weight: 200;
+            """)
+            self.scroll_layout.addWidget(error_label)
 
-    def display_pharmacies(self, pharmacy_list):
-        print(f"🏥 Displaying {len(pharmacy_list)} pharmacies...")
-        if not pharmacy_list:
-            print("❌ No pharmacy list provided!")
+    def display_pharmacies(self):
+        """Eczaneleri görüntüle"""
+        if not self.all_pharmacies:
             return
 
-        # Clear existing content
-        self.clear_layout(self.scroll_layout)
+        for eczane in self.all_pharmacies:
+            self.scroll_layout.addWidget(self.create_eczane_card(eczane))
 
-        # Add cards with animation - NO INTERACTION
-        for i, pharmacy in enumerate(pharmacy_list):
-            print(f"  📍 Adding: {pharmacy.get('adi', 'Unknown')}")
+    def create_eczane_card(self, eczane_info):
+        """Eczane kartı oluştur"""
+        card_widget = QWidget()
+        card_layout = QVBoxLayout()
+        card_widget.setLayout(card_layout)
+
+        # Kart stili
+        card_widget.setStyleSheet(f"""
+            QWidget {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #252525, stop:1 #1e1e1e);
+                border: 1px solid #444444;
+                border-radius: 18px;
+                padding: 0px; 
+                margin: 0px; 
+                margin-bottom: 35px;
+            }}
+            QLabel {{
+                font-family: 'Inter', 'Segoe UI', sans-serif;
+                font-size: 21px;
+                color: #f0f0f0;
+                margin-bottom: 12px;
+                background: transparent;
+                font-weight: 300;
+            }}
+            QLabel.name {{
+                font-size: 36px;
+                font-weight: 600;
+                color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #ffffff, stop:1 #e0e0e0);
+                margin-bottom: 18px;
+            }}
+            QLabel.region {{
+                font-size: 18px;  
+                font-weight: 500;
+                color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #cccccc, stop:1 #aaaaaa); 
+                margin-bottom: 8px;  
+            }}
+            QLabel.info {{
+                font-size: 18px;  
+                color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #e8e8e8, stop:1 #d0d0d0);
+                margin-bottom: 8px;  
+                padding: 2px 0px;  
+                font-weight: 300;
+            }}
+            QLabel#map_label {{ 
+                background: #1a1a1a;
+                border: 2px solid #444444;
+                border-radius: 14px;
+                padding: 0px; 
+            }}
+            QLabel#qr_label {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #3a3a3a, stop:1 #303030);
+                border: 2px solid #666666;
+                border-radius: 14px;
+                padding: 15px;
+            }}
+        """)
+
+        # Gölge efekti
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(30)
+        shadow.setColor(QColor(0, 0, 0, 150))
+        shadow.setOffset(0, 10)
+        card_widget.setGraphicsEffect(shadow)
+
+        # Üst bölüm: Bilgi + QR
+        top_section = QWidget()
+        top_layout = QHBoxLayout(top_section)
+        top_layout.setContentsMargins(35, 35, 35, 25)
+        top_layout.setSpacing(40)  # Biraz daha fazla boşluk
+        
+        # Sol taraf - Bilgiler
+        info_widget = QWidget()
+        info_layout = QVBoxLayout(info_widget)
+        info_layout.setSpacing(15)  # Daha sade spacing
+        info_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Eczane adı
+        name_label = QLabel(eczane_info['name'])
+        name_label.setObjectName("name")
+        name_font = QFont("Inter", 36, QFont.DemiBold)
+        name_label.setFont(name_font)
+        info_layout.addWidget(name_label)
+        
+        # Çizgiyi kaldırıyoruz - direkt bölge
+        
+        # Bölge
+        region_label = QLabel(f"📍 {eczane_info['region']}")
+        region_label.setObjectName("region")
+        region_font = QFont("Inter", 18, QFont.Medium)  # Biraz küçülttük
+        region_label.setFont(region_font)
+        info_layout.addWidget(region_label)
+        
+        # Adres
+        address_label = QLabel(f"🏠 {eczane_info['address']}")
+        address_label.setObjectName("info")
+        address_font = QFont("Inter", 18, QFont.Normal)  # Biraz küçülttük
+        address_label.setFont(address_font)
+        address_label.setWordWrap(True)
+        info_layout.addWidget(address_label)
+        
+        # Telefon
+        phone_label = QLabel(f"📞 {eczane_info['phone']}")
+        phone_label.setObjectName("info")
+        phone_font = QFont("Inter", 18, QFont.Normal)  # Biraz küçülttük
+        phone_label.setFont(phone_font)
+        info_layout.addWidget(phone_label)
+        
+        info_layout.addStretch()
+        
+        # Sağ taraf - QR kod bölümü
+        qr_section = QVBoxLayout()
+        qr_section.setAlignment(Qt.AlignCenter)
+        qr_section.setSpacing(10)
+        
+        # QR başlık yazısı
+        qr_title = QLabel("YOL TARİFİ İÇİN TARAYIN")
+        qr_title.setAlignment(Qt.AlignCenter)
+        qr_title.setStyleSheet("""
+            QLabel {
+                color: #4CAF50;
+                font-size: 14px;
+                font-weight: 600;
+                font-family: 'Inter';
+                margin-bottom: 5px;
+            }
+        """)
+        qr_section.addWidget(qr_title)
+        
+        # QR kod
+        qr_label = self.create_qr_code(eczane_info)
+        qr_section.addWidget(qr_label)
+        
+        # QR widget container
+        qr_container = QWidget()
+        qr_container.setLayout(qr_section)
+        
+        top_layout.addWidget(info_widget, 1)
+        top_layout.addWidget(qr_container, 0)
+        card_layout.addWidget(top_section)
+
+        # Alt bölüm: Harita
+        map_widget = self.create_map_widget(eczane_info)
+        if map_widget:
+            card_layout.addWidget(map_widget)
+
+        card_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        return card_widget
+
+    def create_qr_code(self, eczane_info):
+        """QR kod oluştur"""
+        qr_label = QLabel()
+        qr_label.setObjectName("qr_label")
+        qr_label.setAlignment(Qt.AlignCenter)
+        qr_label.setFixedSize(140, 140)  # Biraz küçülttük
+
+        if eczane_info['coordinates']['lat'] is not None and eczane_info['coordinates']['lon'] is not None:
             try:
-                card = PharmacyCard(pharmacy)
-                self.scroll_layout.addWidget(card)
+                print(f"🔳 QR kod oluşturuluyor: {eczane_info['name']}")
+                qr_map_url = (
+                    f"https://www.google.com/maps/search/?api=1&query={eczane_info['coordinates']['lat']},{eczane_info['coordinates']['lon']}"
+                )
                 
-                # Staggered fade-in animation only
-                QTimer.singleShot(i * 400, lambda c=card: c.fade_in())
+                qr_img = qrcode.QRCode(
+                    version=1,
+                    error_correction=qrcode.constants.ERROR_CORRECT_H,
+                    box_size=6,  # Biraz küçülttük
+                    border=2,
+                )
+                qr_img.add_data(qr_map_url)
+                qr_img.make(fit=True)
+                
+                qr_pil_img = qr_img.make_image(fill_color="#e0e0e0", back_color="transparent")
+                
+                byte_array = BytesIO()
+                qr_pil_img.save(byte_array, format="PNG")
+                
+                qr_pixmap = QPixmap()
+                qr_pixmap.loadFromData(byte_array.getvalue())
+                
+                qr_label.setPixmap(qr_pixmap.scaled(110, 110, Qt.KeepAspectRatio, Qt.SmoothTransformation))  # Küçülttük
+                print(f"✅ QR kod oluşturuldu: {eczane_info['name']}")
                 
             except Exception as e:
-                print(f"❌ Error creating card for {pharmacy.get('adi', 'Unknown')}: {e}")
-                
-        print("✅ All pharmacy cards added!")
-
-    def clear_layout(self, layout):
-        """Clear all widgets from layout"""
-        print(f"🧹 Clearing layout (has {layout.count()} items)...")
-        while layout.count():
-            item = layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-            elif item.layout() is not None:
-                self.clear_layout(item.layout())
-        print("✅ Layout cleared!")
-
-# --- Premium Ad Screen ---
-class AdScreen(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.video_files = []
-        self.current_video_index = 0
-        self.init_ui_screen()
-
-    def init_ui_screen(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Video widget
-        self.video_widget = QVideoWidget()
-        layout.addWidget(self.video_widget)
-
-        # Media player
-        self.media_player = QMediaPlayer(None, QMediaPlayer.VideoSurface)
-        self.media_player.setVideoOutput(self.video_widget)
-        
-        self.media_player.stateChanged.connect(self.media_state_changed)
-        self.media_player.error.connect(self.media_error)
-
-        # Styling
-        self.setStyleSheet("""
-            AdScreen {
-                background-color: #2c3e50;
-            }
-            QVideoWidget {
-                background: transparent;
-                border-radius: 15px;
-            }
-        """)
-
-        # Loading screen
-        self.loading_widget = QWidget()
-        loading_layout = QVBoxLayout(self.loading_widget)
-        loading_layout.setAlignment(Qt.AlignCenter)
-        
-        self.loading_title = QLabel("🎬 REKLAM EKRANI")
-        self.loading_title.setFont(QFont("Inter", 64, QFont.Bold))
-        self.loading_title.setAlignment(Qt.AlignCenter)
-        self.loading_title.setStyleSheet("""
-            color: #ffffff;
-            background-color: rgba(255, 255, 255, 0.1);
-            padding: 80px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 35px;
-            margin: 120px;
-        """)
-        
-        self.status_label = QLabel("Reklamlar hazırlanıyor...")
-        self.status_label.setFont(QFont("Inter", 28, QFont.Normal))
-        self.status_label.setAlignment(Qt.AlignCenter)
-        self.status_label.setStyleSheet("""
-            color: rgba(255, 255, 255, 0.8);
-            background: transparent;
-            padding: 30px;
-        """)
-        
-        loading_layout.addWidget(self.loading_title)
-        loading_layout.addWidget(self.status_label)
-        layout.addWidget(self.loading_widget)
-        
-        self.video_widget.hide()
-
-    def load_videos(self):
-        ads_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ads")
-        
-        if not os.path.exists(ads_folder):
-            os.makedirs(ads_folder)
-            self.status_label.setText("❌ 'ads' klasörü oluşturuldu\nVideo dosyalarını ekleyin")
-            return
-
-        supported_formats = ('.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv')
-        self.video_files = [
-            os.path.join(ads_folder, f) 
-            for f in os.listdir(ads_folder) 
-            if f.lower().endswith(supported_formats)
-        ]
-        
-        if not self.video_files:
-            self.status_label.setText("❌ Video bulunamadı\n'ads' klasörüne video dosyalarını ekleyin")
+                print(f"❌ QR kod hatası: {e}")
+                qr_label.setText("QR\nHata")
+                qr_label.setStyleSheet("color: #FF6B6B; font-size: 12px; font-weight: 400;")
         else:
-            self.loading_widget.hide()
-            self.video_widget.show()
-            self.current_video_index = 0
-            print(f"Loaded {len(self.video_files)} advertisement videos")
+            qr_label.setText("QR\nYok")
+            qr_label.setStyleSheet("color: #FF6B6B; font-size: 12px; font-weight: 400;")
 
-    def play_next_video(self):
-        if not self.video_files:
-            self.status_label.setText("❌ Oynatılacak video yok")
-            self.loading_widget.show()
-            self.video_widget.hide()
-            return
-        
-        if self.current_video_index >= len(self.video_files):
-            self.current_video_index = 0
-        
-        video_path = self.video_files[self.current_video_index]
-        print(f"Playing advertisement: {os.path.basename(video_path)}")
-        
-        self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(video_path)))
-        self.media_player.play()
-        self.current_video_index += 1
+        return qr_label
 
-    def media_state_changed(self, state):
-        if state == QMediaPlayer.StoppedState:
-            QTimer.singleShot(1000, self.play_next_video)
+    def create_map_widget(self, eczane_info):
+        """Harita widget'ı oluştur"""
+        if (eczane_info['coordinates']['lat'] is None or 
+            eczane_info['coordinates']['lon'] is None):
+            print(f"⚠️ Koordinat yok, harita oluşturulmuyor: {eczane_info['name']}")
+            return None
 
-    def media_error(self, error):
-        error_msg = self.media_player.errorString()
-        print(f"Video playback error: {error_msg}")
-        
-        self.status_label.setText(f"⚠️ Video oynatma hatası\n{error_msg[:50]}...\n\nSonraki videoya geçiliyor...")
-        self.loading_widget.show()
-        self.video_widget.hide()
-        
-        QTimer.singleShot(3000, self.play_next_video)
+        try:
+            print(f"🗺️ Harita oluşturuluyor: {eczane_info['name']}")
+            
+            # Rota polyline al
+            route_polyline = get_driving_route_polyline(
+                ECZANE_KUSDEMIR_LAT, ECZANE_KUSDEMIR_LON,
+                eczane_info['coordinates']['lat'], eczane_info['coordinates']['lon'],
+                GOOGLE_MAPS_API_KEY
+            )
 
-# --- Modern Main Application ---
+            map_container = QWidget()
+            map_layout = QVBoxLayout(map_container)
+            map_layout.setContentsMargins(25, 0, 25, 25)
+            
+            map_label = QLabel()
+            map_label.setObjectName("map_label")
+            map_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            
+            # Google Static Maps API boyutları
+            api_map_width = 900
+            api_map_height = 700
+
+            # Google Static Maps URL
+            google_map_url_parts = [
+                f"https://maps.googleapis.com/maps/api/staticmap?",
+                f"size={api_map_width}x{api_map_height}&",
+                f"scale=2&",
+                # Karanlık tema stili
+                f"style=feature:all|element:geometry|color:0x1a1a1a&",
+                f"style=feature:all|element:labels.text.stroke|color:0x1a1a1a&",
+                f"style=feature:all|element:labels.text.fill|color:0x888888&",
+                f"style=feature:water|element:geometry|color:0x0f1419&",
+                f"style=feature:road|element:geometry|color:0x2a2a2a&",
+                f"style=feature:road|element:geometry.stroke|color:0x1a1a1a&",
+                f"style=feature:administrative|element:geometry.stroke|color:0x444444&",
+                f"style=feature:poi|element:labels.text.fill|color:0x666666&",
+                f"markers=color:0x4CAF50%7Csize:mid%7Clabel:A%7C{ECZANE_KUSDEMIR_LAT},{ECZANE_KUSDEMIR_LON}&",
+                f"markers=color:0xF44336%7Csize:mid%7Clabel:E%7C{eczane_info['coordinates']['lat']},{eczane_info['coordinates']['lon']}&"
+            ]
+
+            if route_polyline:
+                google_map_url_parts.append(f"path=color:0x2196F3%7Cweight:6%7Cenc:{route_polyline}&")
+                print(f"✅ Rota polyline eklendi")
+            else:
+                google_map_url_parts.append(f"center={eczane_info['coordinates']['lat']},{eczane_info['coordinates']['lon']}&zoom=14&")
+                print(f"⚠️ Rota polyline yok, merkez koordinat kullanıldı")
+
+            google_map_url_parts.append(f"key={GOOGLE_MAPS_API_KEY}")
+            google_map_url = "".join(google_map_url_parts)
+            
+            print(f"🔗 Harita URL oluşturuldu: {len(google_map_url)} karakter")
+            
+            response = requests.get(google_map_url, stream=True, timeout=15)
+            response.raise_for_status()
+
+            pixmap = QPixmap()
+            pixmap.loadFromData(response.content)
+            
+            if not pixmap.isNull():
+                # Yuvarlatılmış köşeler
+                rounded_pixmap = QPixmap(pixmap.size())
+                rounded_pixmap.fill(Qt.transparent)
+                
+                painter = QPainter(rounded_pixmap)
+                painter.setRenderHint(QPainter.Antialiasing)
+                
+                path = QPainterPath()
+                path.addRoundedRect(QRectF(rounded_pixmap.rect()), 14, 14)
+                painter.setClipPath(path)
+                painter.drawPixmap(0, 0, pixmap)
+                painter.end()
+                
+                # Hedef boyutlar
+                target_map_width_for_display = 810
+                target_map_height_for_display = int(target_map_width_for_display * (api_map_height / api_map_width))
+
+                map_label.setPixmap(rounded_pixmap.scaled(
+                    QSize(target_map_width_for_display, target_map_height_for_display), 
+                    Qt.KeepAspectRatio, 
+                    Qt.SmoothTransformation
+                ))
+                map_label.setAlignment(Qt.AlignCenter)
+                map_layout.addWidget(map_label)
+                
+                print(f"✅ Harita oluşturuldu: {eczane_info['name']}")
+                return map_container
+            else:
+                print(f"❌ Harita görüntüsü yüklenemedi: {eczane_info['name']}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Google Harita hatası: {e}")
+            return None
+
+
+# --- ANA UYGULAMA SINIFI ---
 class EczaneApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Modern Nöbetçi Eczane Vitrin Ekranı")
-        self.setGeometry(100, 50, 1200, 1600)
+        self.setWindowTitle("Nöbetçi Eczaneler")
+        self.setGeometry(100, 100, 900, 1600)
         
-        # For production use fullscreen
-        # self.showFullScreen()
-        # self.setCursor(Qt.BlankCursor)
+        # Tam ekran
+        self.showFullScreen()
 
+        # Ana layout
         self.main_app_layout = QVBoxLayout(self)
         self.main_app_layout.setContentsMargins(0, 0, 0, 0)
         self.main_app_layout.setSpacing(0)
         
-        # Screen stack
-        self.screen_stack = QStackedLayout()
-        self.main_app_layout.addLayout(self.screen_stack)
+        # Nöbetçi Eczane Ekranı
+        self.nobetci_eczane_screen = NobetciEczaneScreen(self)
+        self.main_app_layout.addWidget(self.nobetci_eczane_screen)
 
-        # Initialize screens
-        self.nobetci_eczane_screen = NobetciEczaneScreen()
-        self.screen_stack.addWidget(self.nobetci_eczane_screen)
-
-        self.ad_screen = AdScreen()
-        self.screen_stack.addWidget(self.ad_screen)
-
-        # Screen switching timer
-        self.screen_timer = QTimer(self)
-        self.screen_timer.timeout.connect(self.check_display_mode)
-        self.screen_timer.start(10000)
-
-        # Initialize with pharmacy screen
-        self.check_display_mode()
-
-    def check_display_mode(self):
-        # For demo - always show pharmacy screen
-        if self.screen_stack.currentWidget() != self.nobetci_eczane_screen:
-            print("🔄 Switching to Modern Pharmacy Screen")
-            self.screen_stack.setCurrentWidget(self.nobetci_eczane_screen)
-            self.nobetci_eczane_screen.load_data()
-            self.ad_screen.media_player.stop()
-        return
+        # Ana stil
+        self.setStyleSheet("""
+            EczaneApp {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #0a0a0a, stop:0.5 #050505, stop:1 #000000);
+            }
+        """)
 
     def keyPressEvent(self, event):
-        """Handle keyboard events for admin control only"""
+        """Klavye olayları"""
+        # ESC ile tam ekrandan çık
         if event.key() == Qt.Key_Escape:
-            if self.isFullScreen():
-                self.showNormal()
-                self.setCursor(Qt.ArrowCursor)
-            else:
-                self.close()
+            self.showNormal()
+        # F11 ile tam ekran toggle
         elif event.key() == Qt.Key_F11:
             if self.isFullScreen():
                 self.showNormal()
-                self.setCursor(Qt.ArrowCursor)
             else:
                 self.showFullScreen()
-                self.setCursor(Qt.BlankCursor)
-        elif event.key() == Qt.Key_F5:
-            if isinstance(self.screen_stack.currentWidget(), NobetciEczaneScreen):
-                self.nobetci_eczane_screen.load_data()
-        
+        # R ile manuel refresh
+        elif event.key() == Qt.Key_R:
+            print("🔄 Manuel veri yenileme")
+            self.nobetci_eczane_screen.load_data()
         super().keyPressEvent(event)
 
-def main():
-    """Main application entry point"""
+
+if __name__ == "__main__":
+    # Ana fonksiyon
     app = QApplication(sys.argv)
     
-    # Set application properties
-    app.setApplicationName("Modern Nöbetçi Eczane Ekranı")
-    app.setApplicationVersion("2.0")
-    app.setOrganizationName("Modern Pharmacy Display")
-    
-    # Global styling
+    # Modern font ayarları
     app.setStyleSheet("""
         * {
-            font-family: 'Inter', 'SF Pro Display', 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
-            font-weight: 400;
-            letter-spacing: 0.3px;
-        }
-        QToolTip {
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 12px;
-            padding: 12px;
-            font-size: 14px;
-            font-weight: 500;
+            font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+            font-weight: 300;
+            letter-spacing: 0.5px;
         }
     """)
     
-    # Create and show main window
+    print("🚀 Nöbetçi Eczane Uygulaması Başlatılıyor...")
+    print("📋 Kontroller:")
+    print("   ESC: Tam ekrandan çık")
+    print("   F11: Tam ekran toggle")
+    print("   R: Manuel veri yenileme")
+    
+    # Uygulamayı başlat
     window = EczaneApp()
     window.show()
     
-    print("🚀 Modern Vitrin Ekranı başlatıldı!")
-    print("🖥️  SADECE GÖSTERIM AMAÇLI - ETKİLEŞİM YOK")
-    print("📋 Admin Kontrolleri:")
-    print("   ESC: Çıkış / Tam ekrandan çık")
-    print("   F11: Tam ekran aç/kapat")
-    print("   F5:  Verileri yenile (admin)")
-    
     sys.exit(app.exec_())
-
-if __name__ == '__main__':
-    main()
