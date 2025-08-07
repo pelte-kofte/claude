@@ -19,7 +19,8 @@ Modern ve şık tasarımlı nöbetçi eczane bilgi sistemi. PyQt5 tabanlı bu uy
 ### 🗺️ Harita Entegrasyonu
 - Google Static Maps ile yüksek kaliteli harita görüntüleri
 - Eczane Kusdemir'den seçilen eczaneye rota gösterimi
-- İki nokta arası güzergah çizimi
+- eczane koordinatları: 38.474356157028154, 27.112339648012767
+- nöbetçi ve benim eczanem arası güzergah çizimi
 - Marker'lar ile konum gösterimi
 
 ### 📱 QR Kod Desteği
