@@ -4,277 +4,121 @@ import logging
 import requests
 from bs4 import BeautifulSoup
 import qrcode
-import json
-import re
-import time
 from io import BytesIO
 from datetime import datetime
-from urllib.parse import quote
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
                              QWidget, QLabel, QScrollArea, QFrame)
 from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QFont
 
-# Local imports
-from config import Config, Colors, Fonts, Styles, is_raspberry_pi, is_test_environment
+# Basit Config
+class Config:
+    GOOGLE_MAPS_API_KEY = "AIzaSyCIG70KV9YFvAoxlbqm3LqN_dRfuWZj-eE"
+    OPENWEATHER_API_KEY = "b0d1be7721b4967d8feb810424bd9b6f"
+    TARGET_REGION = "KARŞIYAKA 4"
+    CITY_NAME = "İzmir"
+    WINDOW_WIDTH = 720
+    WINDOW_HEIGHT = 1000
+    DEFAULT_LAT = 38.4612
+    DEFAULT_LON = 27.1285
+    QR_SIZE = 120
 
-# Logging setup
-logging.basicConfig(
-    level=getattr(logging, Config.LOG_LEVEL),
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(Config.LOG_FILE),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+# Renkler
+class Colors:
+    PRIMARY_BG = "#0a0a0a"
+    SECONDARY_BG = "#1a1a1a"
+    CARD_BG = "#1e1e1e"
+    PRIMARY_TEXT = "#ffffff"
+    SECONDARY_TEXT = "#cccccc"
+    ACCENT_TEXT = "#4CAF50"
+    WARNING_TEXT = "#FF9800"
+    ERROR_TEXT = "#F44336"
+    BORDER_COLOR = "#333333"
+
+# Logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class DataFetcher:
-    """Thread'siz basit veri çekme sınıfı"""
+    """Basit veri çekme"""
     
-    def __init__(self):
-        pass
-        
     def fetch_pharmacy_data(self):
-        """İzmir Eczacı Odası'ndan gerçek nöbetçi eczane verilerini çeker - BeautifulSoup ile"""
+        """KARŞIYAKA 4 eczanelerini çek"""
         try:
-            logger.info("Fetching real pharmacy data from İzmir Eczacı Odası...")
+            logger.info("Fetching pharmacy data...")
             
             url = "https://www.izmireczaciodasi.org.tr/nobetci-eczaneler"
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'tr-TR,tr;q=0.9,en;q=0.8'
-            }
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
             
-            logger.info("Downloading pharmacy page...")
-            response = requests.get(url, headers=headers, timeout=30)
+            response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             
-            # BeautifulSoup ile HTML parse et
-            soup = BeautifulSoup(response.content, 'html.parser')
-            logger.info("Successfully parsed HTML with BeautifulSoup")
+            soup = BeautifulSoup(response.text, 'html.parser')
+            logger.info("HTML parsed successfully")
             
-            pharmacies = []
+            # KARŞIYAKA 4 ara
+            page_text = soup.get_text()
+            if "KARŞIYAKA 4" not in page_text:
+                logger.warning("KARŞIYAKA 4 not found")
+                return []
             
-            # Method 1: "KARŞIYAKA 4" kelimesini içeren tüm elementleri bul
-            logger.info("Searching for KARŞIYAKA 4 elements...")
+            logger.info("KARŞIYAKA 4 found!")
             
-            # Tüm metinlerde "KARŞIYAKA 4" arama
-            karşiyaka_elements = soup.find_all(text=re.compile(r'KARŞIYAKA\s*4', re.IGNORECASE))
+            # Telefon linklerini bul
+            phone_links = soup.find_all('a', href=lambda x: x and 'tel:' in x)
             
-            for element in karşiyaka_elements:
-                logger.info(f"Found KARŞIYAKA 4 text: {element.strip()}")
+            for phone_link in phone_links:
+                phone = phone_link.get('href').replace('tel:', '')
+                if len(phone) == 10:
+                    phone = "0" + phone
                 
-                # Bu elementin parent'larından eczane bilgilerini bul
-                parent = element.parent
-                while parent and parent.name:
-                    # Telefon linkini ara
-                    phone_links = parent.find_all('a', href=re.compile(r'tel:'))
+                # Parent text kontrol et
+                parent = phone_link.parent
+                context = ""
+                for _ in range(2):
+                    if parent:
+                        context += parent.get_text()
+                        parent = parent.parent
+                
+                # KARŞIYAKA 4 var mı?
+                if "KARŞIYAKA 4" in context.upper():
+                    logger.info(f"Found pharmacy: {phone}")
                     
-                    if phone_links:
-                        for phone_link in phone_links:
-                            phone = phone_link.get('href').replace('tel:', '')
-                            if len(phone) == 10:
-                                phone = "0" + phone
-                            
-                            # Eczane adını bul - genelde yakınlardaki bold/strong text
-                            pharmacy_name = "Bilinmeyen Eczane"
-                            pharmacy_address = "Adres bulunamadı"
-                            
-                            # Parent'ın içindeki tüm text'leri kontrol et
-                            all_texts = parent.get_text().split('\n')
-                            for text in all_texts:
-                                text = text.strip()
-                                if text and len(text) > 5:
-                                    # Eczane adı genelde "ECZANE" kelimesi içerir
-                                    if 'ECZANE' in text.upper() and len(text) < 50:
-                                        pharmacy_name = text.title()
-                                    # Adres genelde MAH, CAD, SOK içerir
-                                    elif any(word in text.upper() for word in ['MAH', 'CAD', 'SOK', 'BULV', 'CD']) and len(text) > 10:
-                                        pharmacy_address = text
-                            
-                            pharmacy = {
-                                'name': pharmacy_name,
-                                'address': pharmacy_address,
-                                'phone': phone,
-                                'region': 'KARŞIYAKA 4',
-                                'coordinates': self.get_coordinates(pharmacy_address)
-                            }
-                            pharmacies.append(pharmacy)
-                            logger.info(f"Found pharmacy: {pharmacy_name} - {phone}")
+                    # Basit parsing
+                    lines = [line.strip() for line in context.split('\n') if line.strip()]
+                    name = "Karşıyaka 4. Bölge Eczanesi"
+                    address = "Karşıyaka, İzmir"
                     
-                    parent = parent.parent
-                    if not parent:
-                        break
-            
-            # Method 2: Telefon linklerinden geriye doğru KARŞIYAKA 4 ara
-            if not pharmacies:
-                logger.info("Method 1 failed, trying Method 2: scanning all phone links...")
-                
-                all_phone_links = soup.find_all('a', href=re.compile(r'tel:'))
-                logger.info(f"Found {len(all_phone_links)} phone links total")
-                
-                for phone_link in all_phone_links:
-                    phone = phone_link.get('href').replace('tel:', '')
-                    if len(phone) == 10:
-                        phone = "0" + phone
+                    for line in lines:
+                        if 10 < len(line) < 100:
+                            if any(word in line.upper() for word in ['MAH', 'CAD', 'SOK']):
+                                address = line
+                            elif 'ECZANE' in line.upper() and len(line) < 50:
+                                name = line.title()
                     
-                    # Bu telefon linkinin yakınındaki text'te KARŞIYAKA 4 var mı?
-                    parent = phone_link.parent
-                    context_text = ""
-                    
-                    # Yakındaki text'leri topla
-                    for _ in range(5):  # 5 seviye yukarı git
-                        if parent:
-                            context_text += parent.get_text()
-                            parent = parent.parent
-                        else:
-                            break
-                    
-                    # KARŞIYAKA 4 kontrolü
-                    if re.search(r'KARŞIYAKA\s*4', context_text, re.IGNORECASE):
-                        logger.info(f"Found KARŞIYAKA 4 context for phone: {phone}")
-                        
-                        # Eczane bilgilerini çıkar
-                        lines = context_text.split('\n')
-                        pharmacy_name = "Karşıyaka 4. Bölge Eczanesi"
-                        pharmacy_address = "Adres bulunamadı"
-                        
-                        for line in lines:
-                            line = line.strip()
-                            if line and 'ECZANE' in line.upper() and len(line) < 50:
-                                pharmacy_name = line.title()
-                            elif any(word in line.upper() for word in ['MAH', 'CAD', 'SOK', 'BULV', 'CD']) and len(line) > 10 and len(line) < 100:
-                                pharmacy_address = line
-                        
-                        pharmacy = {
-                            'name': pharmacy_name,
-                            'address': pharmacy_address,
-                            'phone': phone,
-                            'region': 'KARŞIYAKA 4',
-                            'coordinates': self.get_coordinates(pharmacy_address)
-                        }
-                        pharmacies.append(pharmacy)
-                        logger.info(f"Added pharmacy from Method 2: {pharmacy_name}")
-            
-            # Method 3: Sayfa içinde "24:00'DEN SONRA- KARŞIYAKA 4" pattern'ini ara
-            if not pharmacies:
-                logger.info("Method 2 failed, trying Method 3: searching for night duty pattern...")
-                
-                page_text = soup.get_text()
-                karşiyaka_4_patterns = [
-                    r'24:00.*?KARŞIYAKA\s*4.*?(\d{10,11})',
-                    r'KARŞIYAKA\s*4.*?tel:(\d{10,11})',
-                    r'SAAT.*?KARŞIYAKA\s*4.*?(\d{10,11})'
-                ]
-                
-                for pattern in karşiyaka_4_patterns:
-                    matches = re.findall(pattern, page_text, re.IGNORECASE | re.DOTALL)
-                    for match in matches:
-                        phone = match
-                        if len(phone) == 10:
-                            phone = "0" + phone
-                        
-                        pharmacy = {
-                            'name': 'Karşıyaka 4. Bölge Nöbetçi Eczanesi',
-                            'address': 'Karşıyaka 4. Bölge, İzmir (Detay bilgi web sitesinde)',
-                            'phone': phone,
-                            'region': 'KARŞIYAKA 4',
-                            'coordinates': {'lat': Config.DEFAULT_LAT, 'lon': Config.DEFAULT_LON}
-                        }
-                        pharmacies.append(pharmacy)
-                        logger.info(f"Found pharmacy with Method 3: {phone}")
-            
-            # Sonuç kontrolü
-            if pharmacies:
-                logger.info(f"SUCCESS: Found {len(pharmacies)} pharmacies for KARŞIYAKA 4")
-                # Duplicate'leri temizle
-                unique_pharmacies = []
-                seen_phones = set()
-                for pharmacy in pharmacies:
-                    if pharmacy['phone'] not in seen_phones:
-                        unique_pharmacies.append(pharmacy)
-                        seen_phones.add(pharmacy['phone'])
-                
-                return unique_pharmacies
-            else:
-                logger.warning("No pharmacies found for KARŞIYAKA 4")
-                
-                # Sayfada KARŞIYAKA 4 var mı kontrol et
-                page_text = soup.get_text()
-                if re.search(r'KARŞIYAKA\s*4', page_text, re.IGNORECASE):
-                    logger.info("KARŞIYAKA 4 exists on page but couldn't extract details")
                     return [{
-                        'name': 'Karşıyaka 4. Bölge Nöbetçi Var',
-                        'address': 'Karşıyaka 4. bölgesinde bugün nöbetçi eczane bulunuyor. Detay bilgiler için: https://www.izmireczaciodasi.org.tr/nobetci-eczaneler',
-                        'phone': 'Web sitesinden kontrol edin',
-                        'region': 'KARŞIYAKA 4',
-                        'coordinates': {'lat': Config.DEFAULT_LAT, 'lon': Config.DEFAULT_LON}
+                        'name': name,
+                        'address': address,
+                        'phone': phone,
+                        'region': 'KARŞIYAKA 4'
                     }]
-                else:
-                    logger.info("KARŞIYAKA 4 not found in today's duty list")
-                    return []
+            
+            # Telefon bulunamadı ama KARŞIYAKA 4 var
+            return [{
+                'name': 'Karşıyaka 4. Bölge Nöbetçi Eczanesi',
+                'address': 'Bugün KARŞIYAKA 4 bölgesinde nöbetçi eczane var',
+                'phone': 'Web sitesinden kontrol edin',
+                'region': 'KARŞIYAKA 4'
+            }]
                     
         except Exception as e:
-            logger.error(f"Error in web scraping with BeautifulSoup: {e}")
-            return self.get_fallback_data()
-    
-    def get_fallback_data(self):
-        """Gerçek veri alınamadığında fallback verisi"""
-        logger.info("Using fallback data - real scraping failed")
-        return [
-            {
-                'name': 'Veri Çekme Hatası',
-                'address': f'{Config.TARGET_REGION} bölgesindeki nöbetçi eczane verileri şu anda çekilemiyor. İnternet bağlantınızı kontrol edin. Manuel kontrol: https://www.izmireczaciodasi.org.tr/nobetci-eczaneler',
-                'phone': 'Web sitesinden kontrol edin',
-                'region': Config.TARGET_REGION,
-                'coordinates': {'lat': Config.DEFAULT_LAT, 'lon': Config.DEFAULT_LON}
-            }
-        ]
-    
-    def get_coordinates(self, address):
-        """Adres için koordinat bilgilerini getirir"""
-        try:
-            if not address or address == 'Adres bilgisi yok':
-                return {'lat': Config.DEFAULT_LAT, 'lon': Config.DEFAULT_LON}
-            
-            # Nominatim API (OpenStreetMap) - Rate limit için gecikme
-            import time
-            time.sleep(1)  # 1 saniye bekle
-            
-            query = f"{address}, {Config.CITY_NAME}, Turkey"
-            url = f"https://nominatim.openstreetmap.org/search"
-            params = {
-                'q': query,
-                'format': 'json',
-                'limit': 1,
-                'countrycodes': 'tr'
-            }
-            headers = {'User-Agent': 'EczaneNobetSistemi/1.0 (claude@anthropic.com)'}
-            
-            response = requests.get(url, params=params, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data:
-                    return {
-                        'lat': float(data[0]['lat']),
-                        'lon': float(data[0]['lon'])
-                    }
-            
-            # Fallback: Karşıyaka varsayılan koordinatları
-            return {'lat': Config.DEFAULT_LAT, 'lon': Config.DEFAULT_LON}
-            
-        except Exception as e:
-            logger.warning(f"Coordinate fetch failed for {address}: {e}")
-            return {'lat': Config.DEFAULT_LAT, 'lon': Config.DEFAULT_LON}
+            logger.error(f"Error: {e}")
+            return []
     
     def fetch_weather_data(self):
-        """Hava durumu verilerini çeker"""
+        """Hava durumu çek"""
         try:
-            logger.info("Fetching weather data...")
             url = f"http://api.openweathermap.org/data/2.5/weather"
             params = {
                 'q': f'{Config.CITY_NAME},TR',
@@ -283,34 +127,20 @@ class DataFetcher:
                 'lang': 'tr'
             }
             
-            response = requests.get(url, params=params, timeout=15)
-            response.raise_for_status()
+            response = requests.get(url, params=params, timeout=10)
             data = response.json()
             
-            weather_info = {
+            return {
                 'temperature': round(data['main']['temp']),
-                'description': data['weather'][0]['description'].title(),
-                'humidity': data['main']['humidity'],
-                'feels_like': round(data['main']['feels_like']),
-                'icon': data['weather'][0]['icon']
+                'description': data['weather'][0]['description'].title()
             }
-            
-            logger.info(f"Weather fetched: {weather_info['temperature']}°C - {weather_info['description']}")
-            return weather_info
             
         except Exception as e:
-            logger.error(f"Error fetching weather data: {e}")
-            # Test verisi döner
-            return {
-                'temperature': 22,
-                'description': 'Test Modu',
-                'humidity': 65,
-                'feels_like': 24,
-                'icon': '01d'
-            }
+            logger.error(f"Weather error: {e}")
+            return {'temperature': 25, 'description': 'Bilgi alınamadı'}
 
 class PharmacyCard(QFrame):
-    """Tek eczane kartı widget'ı"""
+    """Eczane kartı"""
     
     def __init__(self, pharmacy_data):
         super().__init__()
@@ -318,454 +148,327 @@ class PharmacyCard(QFrame):
         self.setup_ui()
         
     def setup_ui(self):
-        """Kart arayüzünü oluşturur"""
-        self.setFrameStyle(QFrame.Box)
-        self.setStyleSheet(Styles.CARD)
-        self.setFixedHeight(280)
+        """Kart UI"""
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {Colors.CARD_BG};
+                border: 1px solid {Colors.BORDER_COLOR};
+                border-radius: 10px;
+                padding: 15px;
+                margin: 5px;
+            }}
+        """)
         
-        layout = QVBoxLayout(self)
-        layout.setSpacing(8)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout = QHBoxLayout(self)
+        
+        # Sol: Bilgiler
+        info_layout = QVBoxLayout()
         
         # Eczane adı
         name_label = QLabel(self.pharmacy_data['name'])
-        name_label.setStyleSheet(Styles.SUBTITLE_LABEL)
+        name_label.setFont(QFont('Arial', 18, QFont.Bold))
+        name_label.setStyleSheet(f"color: {Colors.ACCENT_TEXT};")
         name_label.setWordWrap(True)
-        layout.addWidget(name_label)
+        info_layout.addWidget(name_label)
         
         # Adres
-        address_label = QLabel(self.pharmacy_data['address'])
-        address_label.setStyleSheet(Styles.NORMAL_LABEL)
+        address_label = QLabel(f"📍 {self.pharmacy_data['address']}")
+        address_label.setFont(QFont('Arial', 12))
+        address_label.setStyleSheet(f"color: {Colors.SECONDARY_TEXT};")
         address_label.setWordWrap(True)
-        layout.addWidget(address_label)
+        info_layout.addWidget(address_label)
         
         # Telefon
         phone_label = QLabel(f"📞 {self.pharmacy_data['phone']}")
-        phone_label.setStyleSheet(Styles.NORMAL_LABEL)
-        layout.addWidget(phone_label)
+        phone_label.setFont(QFont('Arial', 14))
+        phone_label.setStyleSheet(f"color: {Colors.PRIMARY_TEXT};")
+        info_layout.addWidget(phone_label)
         
-        # Alt kısım: QR kod
+        # Bölge
+        region_label = QLabel(f"🏢 {self.pharmacy_data['region']}")
+        region_label.setFont(QFont('Arial', 12))
+        region_label.setStyleSheet(f"color: {Colors.WARNING_TEXT};")
+        info_layout.addWidget(region_label)
+        
+        layout.addLayout(info_layout, 2)
+        
+        # Sağ: QR kod
         qr_widget = self.create_qr_widget()
-        layout.addWidget(qr_widget)
-        
-        layout.addStretch()
+        layout.addWidget(qr_widget, 1)
     
     def create_qr_widget(self):
-        """QR kod widget'ını oluşturur"""
-        qr_widget = QWidget()
-        qr_layout = QHBoxLayout(qr_widget)
-        qr_layout.setContentsMargins(0, 10, 0, 0)
+        """QR kod oluştur"""
+        qr_container = QWidget()
+        qr_layout = QVBoxLayout(qr_container)
         
         try:
-            # QR kod oluştur
-            coords = self.pharmacy_data['coordinates']
-            maps_url = f"https://www.google.com/maps?q={coords['lat']},{coords['lon']}"
+            # Google Maps linki
+            maps_url = f"https://www.google.com/maps?q={Config.DEFAULT_LAT},{Config.DEFAULT_LON}"
             
+            # QR kod oluştur
             qr = qrcode.QRCode(version=1, box_size=3, border=2)
             qr.add_data(maps_url)
             qr.make(fit=True)
             
             qr_img = qr.make_image(fill_color="white", back_color="black")
             
-            # QPixmap'e dönüştür
+            # QPixmap'e çevir
             buffer = BytesIO()
             qr_img.save(buffer, format='PNG')
             buffer.seek(0)
             
             pixmap = QPixmap()
             pixmap.loadFromData(buffer.getvalue())
-            pixmap = pixmap.scaled(Config.QR_SIZE, Config.QR_SIZE, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            pixmap = pixmap.scaled(Config.QR_SIZE, Config.QR_SIZE, Qt.KeepAspectRatio)
             
             qr_label = QLabel()
             qr_label.setPixmap(pixmap)
             qr_label.setAlignment(Qt.AlignCenter)
             
-            # QR açıklama
-            qr_text_layout = QVBoxLayout()
-            qr_text = QLabel("📱 QR Kod ile\nYol Tarifi")
-            qr_text.setStyleSheet(f"color: {Colors.SECONDARY_TEXT}; font-size: {Fonts.SMALL_SIZE}px;")
+            qr_text = QLabel("QR ile Yol Tarifi")
+            qr_text.setFont(QFont('Arial', 10))
+            qr_text.setStyleSheet(f"color: {Colors.SECONDARY_TEXT};")
             qr_text.setAlignment(Qt.AlignCenter)
-            qr_text_layout.addWidget(qr_text)
             
-            # Google Maps link
-            coords_text = QLabel(f"📍 {coords['lat']:.4f}, {coords['lon']:.4f}")
-            coords_text.setStyleSheet(f"color: {Colors.ACCENT_TEXT}; font-size: {Fonts.TINY_SIZE}px;")
-            coords_text.setAlignment(Qt.AlignCenter)
-            qr_text_layout.addWidget(coords_text)
-            
-            # Layout'a ekle
             qr_layout.addWidget(qr_label)
-            qr_layout.addLayout(qr_text_layout)
-            qr_layout.addStretch()
-            
-            logger.info(f"QR code generated for {self.pharmacy_data['name']}")
+            qr_layout.addWidget(qr_text)
             
         except Exception as e:
-            logger.error(f"QR code generation failed: {e}")
-            error_label = QLabel("❌ QR Kod Hatası")
-            error_label.setStyleSheet(f"color: {Colors.ERROR_TEXT}; font-size: {Fonts.SMALL_SIZE}px;")
-            error_label.setAlignment(Qt.AlignCenter)
+            logger.error(f"QR error: {e}")
+            error_label = QLabel("QR Hatası")
+            error_label.setStyleSheet(f"color: {Colors.ERROR_TEXT};")
             qr_layout.addWidget(error_label)
         
-        return qr_widget
+        return qr_container
 
 class HeaderWidget(QWidget):
-    """Üst başlık widget'ı"""
+    """Üst başlık"""
     
     def __init__(self):
         super().__init__()
-        self.weather_data = {}
         self.setup_ui()
         
     def setup_ui(self):
-        """Header arayüzünü oluşturur"""
-        self.setObjectName("header")
-        self.setStyleSheet(Styles.HEADER)
-        self.setFixedHeight(100)
+        """Header UI"""
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {Colors.SECONDARY_BG};
+                border-bottom: 2px solid {Colors.ACCENT_TEXT};
+                padding: 10px;
+            }}
+        """)
+        self.setFixedHeight(80)
         
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(15, 10, 15, 10)
         
-        # Sol taraf: Logo ve başlık
+        # Sol: Başlık
         left_layout = QVBoxLayout()
         
         title_label = QLabel("🏥 NÖBETÇİ ECZANELER")
-        title_label.setStyleSheet(Styles.TITLE_LABEL)
+        title_label.setFont(QFont('Arial', 20, QFont.Bold))
+        title_label.setStyleSheet(f"color: {Colors.PRIMARY_TEXT};")
         left_layout.addWidget(title_label)
         
         region_label = QLabel(f"📍 {Config.TARGET_REGION}")
-        region_label.setStyleSheet(Styles.SUBTITLE_LABEL)
+        region_label.setFont(QFont('Arial', 12))
+        region_label.setStyleSheet(f"color: {Colors.ACCENT_TEXT};")
         left_layout.addWidget(region_label)
         
         layout.addLayout(left_layout)
         layout.addStretch()
         
-        # Sağ taraf: Tarih, saat, hava durumu
+        # Sağ: Tarih ve hava
         right_layout = QVBoxLayout()
-        right_layout.setAlignment(Qt.AlignRight | Qt.AlignTop)
         
-        # Tarih ve saat
         self.datetime_label = QLabel()
-        self.datetime_label.setStyleSheet(f"""
-            QLabel {{
-                color: {Colors.PRIMARY_TEXT};
-                font-size: {Fonts.TIME_SIZE}px;
-                font-weight: bold;
-                text-align: right;
-            }}
-        """)
+        self.datetime_label.setFont(QFont('Arial', 14, QFont.Bold))
+        self.datetime_label.setStyleSheet(f"color: {Colors.PRIMARY_TEXT};")
         self.datetime_label.setAlignment(Qt.AlignRight)
         right_layout.addWidget(self.datetime_label)
         
-        # Hava durumu
-        self.weather_label = QLabel("🌡️ Yükleniyor...")
-        self.weather_label.setStyleSheet(f"""
-            QLabel {{
-                color: {Colors.ACCENT_TEXT};
-                font-size: {Fonts.SUBTITLE_SIZE}px;
-                text-align: right;
-            }}
-        """)
+        self.weather_label = QLabel("Yükleniyor...")
+        self.weather_label.setFont(QFont('Arial', 12))
+        self.weather_label.setStyleSheet(f"color: {Colors.ACCENT_TEXT};")
         self.weather_label.setAlignment(Qt.AlignRight)
         right_layout.addWidget(self.weather_label)
         
         layout.addLayout(right_layout)
         
-        # Zaman güncellemesi için timer
-        self.time_timer = QTimer()
-        self.time_timer.timeout.connect(self.update_datetime)
-        self.time_timer.start(Config.TIME_UPDATE_INTERVAL)
+        # Zaman timer
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_datetime)
+        self.timer.start(1000)
         self.update_datetime()
     
     def update_datetime(self):
-        """Tarih ve saati günceller"""
+        """Tarih saat güncelle"""
         now = datetime.now()
-        date_str = now.strftime("%d.%m.%Y")
-        time_str = now.strftime("%H:%M:%S")
-        day_str = now.strftime("%A")
-        
-        # Türkçe gün isimleri
-        day_names = {
-            'Monday': 'Pazartesi', 'Tuesday': 'Salı', 'Wednesday': 'Çarşamba',
-            'Thursday': 'Perşembe', 'Friday': 'Cuma', 'Saturday': 'Cumartesi', 'Sunday': 'Pazar'
-        }
-        day_tr = day_names.get(day_str, day_str)
-        
-        datetime_text = f"{time_str}\n{date_str} {day_tr}"
-        self.datetime_label.setText(datetime_text)
+        self.datetime_label.setText(now.strftime("%H:%M:%S\n%d.%m.%Y"))
     
     def update_weather(self, weather_data):
-        """Hava durumu bilgilerini günceller"""
-        self.weather_data = weather_data
-        
+        """Hava durumu güncelle"""
         temp = weather_data.get('temperature', 0)
-        desc = weather_data.get('description', 'Bilinmiyor')
-        
-        # Sıcaklığa göre renk seçimi
-        if temp < 10:
-            temp_color = Colors.TEMP_COLD
-        elif temp < 20:
-            temp_color = Colors.TEMP_MILD
-        elif temp < 30:
-            temp_color = Colors.TEMP_WARM
-        else:
-            temp_color = Colors.TEMP_HOT
-        
-        weather_text = f"🌡️ {temp}°C\n{desc}"
-        self.weather_label.setText(weather_text)
-        self.weather_label.setStyleSheet(f"""
-            QLabel {{
-                color: {temp_color};
-                font-size: {Fonts.SUBTITLE_SIZE}px;
-                font-weight: 500;
-                text-align: right;
-            }}
-        """)
+        desc = weather_data.get('description', '')
+        self.weather_label.setText(f"🌡️ {temp}°C\n{desc}")
 
 class MainWindow(QMainWindow):
-    """Ana pencere sınıfı"""
+    """Ana pencere"""
     
     def __init__(self):
         super().__init__()
-        self.pharmacies = []
         self.data_fetcher = DataFetcher()
         self.setup_ui()
         self.setup_timers()
         
     def setup_ui(self):
-        """Ana arayüzü oluşturur"""
-        self.setWindowTitle("Nöbetçi Eczane Sistemi - Test Modu")
-        self.setStyleSheet(Styles.MAIN_WINDOW)
+        """Ana UI"""
+        self.setWindowTitle("Nöbetçi Eczane Sistemi")
+        self.setStyleSheet(f"background-color: {Colors.PRIMARY_BG}; color: {Colors.PRIMARY_TEXT};")
         self.resize(Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT)
         
-        # Ana widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Ana layout
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        layout = QVBoxLayout(central_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         
         # Header
         self.header = HeaderWidget()
-        main_layout.addWidget(self.header)
+        layout.addWidget(self.header)
         
-        # İçerik alanı
+        # İçerik
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.scroll_area.setStyleSheet(Styles.SCROLLBAR)
         
-        # Scroll widget
         self.scroll_widget = QWidget()
         self.scroll_layout = QVBoxLayout(self.scroll_widget)
         self.scroll_layout.setSpacing(10)
         self.scroll_layout.setContentsMargins(10, 10, 10, 10)
         
-        # İlk yükleme mesajı
-        loading_label = QLabel("📡 Veriler yükleniyor...")
-        loading_label.setStyleSheet(Styles.TITLE_LABEL)
-        loading_label.setAlignment(Qt.AlignCenter)
-        self.scroll_layout.addWidget(loading_label)
+        # Yükleme mesajı
+        self.loading_label = QLabel("📡 Yükleniyor...")
+        self.loading_label.setFont(QFont('Arial', 16))
+        self.loading_label.setStyleSheet(f"color: {Colors.ACCENT_TEXT}; padding: 20px;")
+        self.loading_label.setAlignment(Qt.AlignCenter)
+        self.scroll_layout.addWidget(self.loading_label)
         
         self.scroll_area.setWidget(self.scroll_widget)
-        main_layout.addWidget(self.scroll_area)
+        layout.addWidget(self.scroll_area)
         
-        # Alt bilgi çubuğu
-        footer = QLabel("💊 Test Modu Aktif • F11: Tam Ekran • R: Yenile • ESC: Çıkış")
-        footer.setStyleSheet(f"""
-            QLabel {{
-                background-color: {Colors.SECONDARY_BG};
-                color: {Colors.SECONDARY_TEXT};
-                font-size: {Fonts.SMALL_SIZE}px;
-                padding: 8px;
-                border-top: 1px solid {Colors.BORDER_COLOR};
-                text-align: center;
-            }}
-        """)
+        # Footer
+        footer = QLabel("💊 F11: Tam Ekran • R: Yenile • ESC: Çıkış")
+        footer.setFont(QFont('Arial', 10))
+        footer.setStyleSheet(f"background-color: {Colors.SECONDARY_BG}; color: {Colors.SECONDARY_TEXT}; padding: 5px;")
         footer.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(footer)
+        layout.addWidget(footer)
     
     def setup_timers(self):
-        """Timer'ları ayarlar"""
-        # İlk veri yükleme (2 saniye sonra)
-        QTimer.singleShot(2000, self.load_initial_data)
+        """Timer'lar"""
+        QTimer.singleShot(1000, self.load_data)
         
-        # Hava durumu timer'ı (15 dakikada bir)
+        # Hava durumu timer
         self.weather_timer = QTimer()
-        self.weather_timer.timeout.connect(self.fetch_weather_data)
-        self.weather_timer.start(Config.WEATHER_UPDATE_INTERVAL)
+        self.weather_timer.timeout.connect(self.fetch_weather)
+        self.weather_timer.start(15 * 60 * 1000)  # 15 dakika
         
-        # Eczane veri timer'ı (2 saatte bir)
+        # Eczane timer
         self.pharmacy_timer = QTimer()
-        self.pharmacy_timer.timeout.connect(self.fetch_pharmacy_data)
-        self.pharmacy_timer.start(Config.PHARMACY_UPDATE_INTERVAL)
+        self.pharmacy_timer.timeout.connect(self.fetch_pharmacies)
+        self.pharmacy_timer.start(2 * 60 * 60 * 1000)  # 2 saat
     
-    def load_initial_data(self):
-        """İlk veri yüklemesini yapar"""
-        logger.info("Loading initial data...")
-        self.fetch_pharmacy_data()
-        self.fetch_weather_data()
+    def load_data(self):
+        """Veri yükle"""
+        self.fetch_pharmacies()
+        self.fetch_weather()
     
-    def fetch_pharmacy_data(self):
-        """Eczane verilerini çeker"""
+    def fetch_pharmacies(self):
+        """Eczane verisi çek"""
         try:
             pharmacies = self.data_fetcher.fetch_pharmacy_data()
             self.update_pharmacy_display(pharmacies)
         except Exception as e:
-            logger.error(f"Error fetching pharmacy data: {e}")
-            self.show_error(f"Eczane verileri yüklenemedi: {str(e)}")
+            logger.error(f"Pharmacy fetch error: {e}")
+            self.show_error("Eczane verileri yüklenemedi")
     
-    def fetch_weather_data(self):
-        """Hava durumu verilerini çeker"""
+    def fetch_weather(self):
+        """Hava durumu çek"""
         try:
             weather_data = self.data_fetcher.fetch_weather_data()
             self.header.update_weather(weather_data)
         except Exception as e:
-            logger.error(f"Error fetching weather data: {e}")
+            logger.error(f"Weather fetch error: {e}")
     
     def update_pharmacy_display(self, pharmacies):
-        """Eczane listesini günceller"""
-        self.pharmacies = pharmacies
-        
-        # Önceki widget'ları temizle
-        for i in reversed(range(self.scroll_layout.count())):
-            child = self.scroll_layout.itemAt(i).widget()
-            if child:
-                child.setParent(None)
+        """Eczane listesi güncelle"""
+        self.clear_layout()
         
         if not pharmacies:
-            # Eczane bulunamadı
-            no_pharmacy_label = QLabel("⚠️ Şu anda nöbetçi eczane bulunamadı")
-            no_pharmacy_label.setStyleSheet(f"""
-                QLabel {{
-                    color: {Colors.WARNING_TEXT};
-                    font-size: {Fonts.TITLE_SIZE}px;
-                    font-weight: bold;
-                    padding: 40px;
-                    text-align: center;
-                }}
-            """)
-            no_pharmacy_label.setAlignment(Qt.AlignCenter)
-            self.scroll_layout.addWidget(no_pharmacy_label)
+            no_data_label = QLabel("⚠️ Bugün Karşıyaka 4. bölgede nöbetçi eczane bulunamadı")
+            no_data_label.setFont(QFont('Arial', 16, QFont.Bold))
+            no_data_label.setStyleSheet(f"color: {Colors.WARNING_TEXT}; padding: 30px;")
+            no_data_label.setAlignment(Qt.AlignCenter)
+            no_data_label.setWordWrap(True)
+            self.scroll_layout.addWidget(no_data_label)
         else:
             # Başlık
             title_label = QLabel(f"🏥 {len(pharmacies)} Nöbetçi Eczane Bulundu")
-            title_label.setStyleSheet(f"""
-                QLabel {{
-                    color: {Colors.ACCENT_TEXT};
-                    font-size: {Fonts.TITLE_SIZE}px;
-                    font-weight: bold;
-                    padding: 20px 10px;
-                    text-align: center;
-                }}
-            """)
+            title_label.setFont(QFont('Arial', 18, QFont.Bold))
+            title_label.setStyleSheet(f"color: {Colors.ACCENT_TEXT}; padding: 15px;")
             title_label.setAlignment(Qt.AlignCenter)
             self.scroll_layout.addWidget(title_label)
             
             # Eczane kartları
             for pharmacy in pharmacies:
-                try:
-                    card = PharmacyCard(pharmacy)
-                    self.scroll_layout.addWidget(card)
-                except Exception as e:
-                    logger.error(f"Error creating pharmacy card: {e}")
+                card = PharmacyCard(pharmacy)
+                self.scroll_layout.addWidget(card)
         
-        # Stretch ekle
         self.scroll_layout.addStretch()
-        
         logger.info(f"UI updated with {len(pharmacies)} pharmacies")
     
+    def clear_layout(self):
+        """Layout temizle"""
+        while self.scroll_layout.count():
+            item = self.scroll_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+    
     def show_error(self, error_message):
-        """Hata mesajını gösterir"""
-        # Önceki widget'ları temizle
-        for i in reversed(range(self.scroll_layout.count())):
-            child = self.scroll_layout.itemAt(i).widget()
-            if child:
-                child.setParent(None)
+        """Hata göster"""
+        self.clear_layout()
         
         error_label = QLabel(f"❌ {error_message}")
-        error_label.setStyleSheet(f"""
-            QLabel {{
-                color: {Colors.ERROR_TEXT};
-                font-size: {Fonts.SUBTITLE_SIZE}px;
-                font-weight: bold;
-                padding: 30px;
-                text-align: center;
-            }}
-        """)
+        error_label.setFont(QFont('Arial', 14, QFont.Bold))
+        error_label.setStyleSheet(f"color: {Colors.ERROR_TEXT}; padding: 30px;")
         error_label.setAlignment(Qt.AlignCenter)
-        error_label.setWordWrap(True)
         self.scroll_layout.addWidget(error_label)
-        
-        retry_label = QLabel("🔄 Sistem otomatik olarak tekrar deneyecek...")
-        retry_label.setStyleSheet(f"""
-            QLabel {{
-                color: {Colors.SECONDARY_TEXT};
-                font-size: {Fonts.NORMAL_SIZE}px;
-                padding: 20px;
-                text-align: center;
-            }}
-        """)
-        retry_label.setAlignment(Qt.AlignCenter)
-        self.scroll_layout.addWidget(retry_label)
     
     def keyPressEvent(self, event):
-        """Klavye olayları"""
+        """Klavye"""
         if event.key() == Qt.Key_F11:
-            # Tam ekran toggle
             if self.isFullScreen():
                 self.showNormal()
-                logger.info("Switched to windowed mode")
             else:
                 self.showFullScreen()
-                logger.info("Switched to fullscreen mode")
         elif event.key() == Qt.Key_R:
-            # Manuel refresh
-            logger.info("Manual refresh triggered")
-            self.load_initial_data()
+            logger.info("Manuel yenileme")
+            self.load_data()
         elif event.key() == Qt.Key_Escape:
-            # Çıkış
-            logger.info("Exit triggered by user")
             self.close()
-        
-        super().keyPressEvent(event)
 
 def main():
     """Ana fonksiyon"""
-    logger.info("="*50)
-    logger.info("Nöbetçi Eczane Sistemi Başlatılıyor - Thread'siz Mod")
-    logger.info(f"Target Region: {Config.TARGET_REGION}")
-    logger.info(f"Test Mode: {Config.TEST_MODE}")
-    logger.info("="*50)
+    logger.info("Nöbetçi Eczane Sistemi başlatılıyor...")
     
-    try:
-        # Qt uygulamasını başlat
-        app = QApplication(sys.argv)
-        app.setApplicationName("Nöbetçi Eczane Sistemi")
-        app.setApplicationVersion("2.0.0")
-        app.setOrganizationName("Claude Project")
-        
-        # Ana pencereyi oluştur
-        window = MainWindow()
-        window.show()
-        
-        logger.info("Application started successfully")
-        logger.info("Kontroller: F11=Tam Ekran, R=Yenile, ESC=Çıkış")
-        
-        # Event loop başlat
-        exit_code = app.exec_()
-        
-        logger.info("Application shutting down...")
-        return exit_code
-        
-    except Exception as e:
-        logger.critical(f"Critical error: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+    app = QApplication(sys.argv)
+    app.setApplicationName("Nöbetçi Eczane Sistemi")
+    
+    window = MainWindow()
+    window.show()
+    
+    logger.info("Uygulama başlatıldı")
+    return app.exec_()
 
 if __name__ == "__main__":
     sys.exit(main())
