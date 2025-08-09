@@ -1,30 +1,4 @@
-# Claude - Nöbetçi Eczane Sistemi Requirements
-# Core Dependencies
-
-# PyQt5 for GUI
-PyQt5==5.15.10
-PyQt5-Qt5==5.15.2
-PyQt5-sip==12.13.0
-
-# Web scraping
-requests==2.31.0
-beautifulsoup4==4.12.2
-lxml==4.9.3
-
-# Geocoding
-geopy==2.4.1
-
-# Image processing and QR codes
-Pillow==10.1.0
-qrcode==7.4.2
-
-# Optional dependencies for enhanced functionality
-# Uncomment if needed:
-# opencv-python==4.8.1.78  # For advanced image processing
-# numpy==1.24.4            # For numerical operations
-# matplotlib==3.7.2        # For plotting/visualization
-
-# Development dependencies (optional)
-# pytest==7.4.3           # For testing
-# black==23.9.1            # Code formatting
-# flake8==6.1.0            # Code linting 
+echo requests > requirements.txt
+echo beautifulsoup4 >> requirements.txt
+echo qrcode[pil] >> requirements.txt
+echo PyQt5 >> requirements.txt
