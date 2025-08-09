@@ -5,23 +5,30 @@ Modern ve şık tasarımlı nöbetçi eczane bilgi sistemi. PyQt5 tabanlı bu uy
 ## 🌟 Özellikler
 
 ###
-🔥 KARŞIYAKA 4 Eczane Projesi - TAM ÇALIŞIYOR:
+🔥 KARŞIYAKA 4 Eczane Projesi - FULL WORKING:
 
 GitHub: https://github.com/pelte-kofte/claude
-Çalışan dosya: main_final.py
+Çalışan dosya: main.py
 
 Scraping detayları:
-- HTML yapısı: h4.red > strong içinde "KARŞIYAKA 4"
-- Google Maps: parent div'de google.com/maps linki
-- QR kod: maps URL'sinden oluşturuluyor
-- UI: PyQt5 - sol taraf bilgiler, sağ taraf QR kod
+- HTML yapısı: h4.red > strong içinde "KARŞIYAKA 4" ara
+- Google Maps: parent div'de google.com/maps linki çek
+- Telefon: parent div'de tel: linki
+- Adres: fa-home icon'dan sonraki text
 
-Son commit: "Working KARŞIYAKA 4 scraping with QR code"
+Özellikler:
+- Dikey ekran layout (720x1000)
+- Gerçek yol tarifi (Google Directions API + polyline)
+- Kuşdemir Eczanesi'nden başlayan rota (38.474, 27.112)
+- QR kod + eczane bilgileri
+- Mesafe ve süre gösterimi
+
+API Keys:
+- Google Maps: AIzaSyCIG70KV9YFvAoxlbqm3LqN_dRfuWZj-eE
+- OpenWeather: b0d1be7721b4967d8feb810424bd9b6f
+
 Status: ✅ FULL WORKING
-
-Çalıştırma:
-pip install -r requirements.txt
-python main_final.py
+Çalıştırma: python main.py
 
 ###
 echo # KARŞIYAKA 4 Nöbetçi Eczane Sistemi > README.md
