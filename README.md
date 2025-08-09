@@ -1,32 +1,16 @@
 # Claude - Nöbetçi Eczane Gösterge Sistemi
 
-Modern ve şık tasarımlı nöbetçi eczane bilgi sistemi. PyQt5 tabanlı bu uygulama, İzmir Eczacı Odası'ndan nöbetçi eczane bilgilerini çekerek kullanıcı dostu bir arayüzde gösterir.
+Modern ve şık tasarımlı nöbetçi eczane bilgi sistemi. PyQt5 tabanlı bu uygulama, İzmir Eczacı Odası'ndan nöbetçi eczane bilgilerini çekerek arayüzde gösterir.
 
 ## 🌟 Özellikler
 
-### 📱 Modern Arayüz
-- Koyu tema tasarım
-- Responsive ve şık kart görünümü
-- Smooth animasyonlar ve gölge efektleri
-- Tam ekran gösterim desteği
-
-### 🏥 Eczane Bilgileri
-- Gerçek zamanlı nöbetçi eczane verileri
-- Eczane adı, adresi ve telefon bilgileri
-- Bölge filtreleme (varsayılan: KARŞIYAKA 4)
-- Otomatik veri güncellemesi (2 saatte bir)
-
-### 🗺️ Harita Entegrasyonu
-- Google Static Maps ile yüksek kaliteli harita görüntüleri
-- Eczane Kusdemir'den seçilen eczaneye rota gösterimi
-- eczane koordinatları: 38.474356157028154, 27.112339648012767
-- nöbetçi ve benim eczanem arası güzergah çizimi
-- Marker'lar ile konum gösterimi
-
-### 📱 QR Kod Desteği
-- NÖBETÇİ ECZANEİÇİN QR KOD OLUŞTURMA
-- QR kod ile Google Maps'te konum açma
-- Mobil cihazlarla kolay entegrasyon
+###
+KARŞIYAKA 4 eczane projesi:
+- Scraping: h4.red > strong (KARŞIYAKA 4)
+- Google Maps: parent div'de google.com/maps linki
+- QR: maps URL'den oluştur
+- UI: PyQt5, sol bilgi sağ QR
+- GitHub: [link]
 
 ### 🌤️ Hava Durumu
 - OpenWeatherMap API entegrasyonu
