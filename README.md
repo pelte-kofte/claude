@@ -24,7 +24,7 @@ Modern ve şık tasarımlı nöbetçi eczane bilgi sistemi. PyQt5 tabanlı bu uy
 - Marker'lar ile konum gösterimi
 
 ### 📱 QR Kod Desteği
-- Her eczane için otomatik QR kod oluşturma
+- NÖBETÇİ ECZANEİÇİN QR KOD OLUŞTURMA
 - QR kod ile Google Maps'te konum açma
 - Mobil cihazlarla kolay entegrasyon
 
@@ -38,7 +38,7 @@ Modern ve şık tasarımlı nöbetçi eczane bilgi sistemi. PyQt5 tabanlı bu uy
 - Zaman tabanlı ekran değiştirme
 - Video reklam desteği (MP4, AVI, MOV, MKV, WebM)
 - Otomatik video döngüsü
-- Nöbet saatleri dışında reklam gösterimi
+- Nöbet saatleri dışında reklam gösterimi (8:45-18:45)
 
 ## 🚀 Kurulum
 
