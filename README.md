@@ -5,6 +5,7 @@ Modern ve şık tasarımlı nöbetçi eczane bilgi sistemi. PyQt5 tabanlı bu uy
 ## 🌟 Özellikler
 
 ###
+YENİ CHAT İÇİN NOT
 KARŞIYAKA 4 eczane projesi:
 - Scraping: h4.red > strong (KARŞIYAKA 4)
 - Google Maps: parent div'de google.com/maps linki
@@ -12,6 +13,17 @@ KARŞIYAKA 4 eczane projesi:
 - UI: PyQt5, sol bilgi sağ QR
 - GitHub: [link]
 
+###
+echo # KARŞIYAKA 4 Nöbetçi Eczane Sistemi > README.md
+echo. >> README.md
+echo ## Çalıştırma: >> README.md
+echo pip install -r requirements.txt >> README.md
+echo python main_final.py >> README.md
+echo. >> README.md
+echo ## Scraping Detayları: >> README.md
+echo - HTML yapısı: h4.red ^> strong >> README.md
+echo - Google Maps: parent div'de google.com/maps >> README.md
+echo - QR kod: maps linkinden oluşur >> README.md
 ### 🌤️ Hava Durumu
 - OpenWeatherMap API entegrasyonu
 - İzmir için güncel hava durumu
@@ -75,43 +87,6 @@ mkdir ads
 # Video dosyalarınızı ads/ klasörüne kopyalayın
 ```
 
-7. **Uygulamayı çalıştırın:**
-```bash
-python main.py
-```
-
-## ⚙️ Yapılandırma
-
-### API Anahtarları
-
-#### Google Maps API
-1. [Google Cloud Console](https://console.cloud.google.com/) 'a gidin
-2. Yeni proje oluşturun veya mevcut projeyi seçin
-3. "APIs & Services" > "Library" bölümünden şu API'leri etkinleştirin:
-   - Maps Static API
-   - Directions API
-4. "Credentials" bölümünden API anahtarı oluşturun
-5. API anahtarını `GOOGLE_MAPS_API_KEY` çevresel değişkenine atayın
-
-#### OpenWeatherMap API
-1. [OpenWeatherMap](https://openweathermap.org/api) 'e kaydolun
-2. Ücretsiz API anahtarınızı alın
-3. API anahtarını `OPENWEATHER_API_KEY` çevresel değişkenine atayın
-
-### Hedef Bölge Değiştirme
-`config.py` dosyasındaki `Config` sınıfında `TARGET_REGION` değerini değiştirin:
-```python
-class Config:
-    TARGET_REGION = "BORNOVA 2"  # İstediğiniz bölgeye değiştirin
-```
-
-### Nöbet Saatleri
-Nöbet saatlerini değiştirmek için `Config` sınıfını düzenleyin:
-```python
-class Config:
-    NOBET_START_TIME = QTime(18, 45)  # 18:45
-    NOBET_END_TIME = QTime(8, 45)     # 08:45
-```
 
 ## 🎮 Kontroller
 
