@@ -14,7 +14,7 @@ from PyQt5.QtMultimediaWidgets import *
 class ElegantVerticalEczaneApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("KARŞIYAKA 4 Nöbetçi Eczane - Elegant Vertical Display")
+        self.setWindowTitle("KARŞIYAKA 4 Nöbetçi Eczane - Modern Glassmorphism")
         
         # DİKEY MONİTÖR İÇİN BOYUTLAR - ZORUNLU DİKEY
         self.setFixedSize(720, 1280)  # Fixed size - zorla dikey
@@ -28,16 +28,22 @@ class ElegantVerticalEczaneApp(QMainWindow):
         self.current_mode = None
         self.video_path = None
         
-        # ELEGANT TEMA RENKLERI
+        # 🎨 NORMAL ELEGANT RENK PALETİ (MOR FESTIVAL İPTAL)
         self.colors = {
-            'primary': '#1a1a2e',
-            'secondary': '#16213e',
-            'accent': '#e94560',
-            'gold': '#ffd700',
-            'white': '#ffffff',
-            'light_gray': '#f8f9fa',
-            'dark_gray': '#2c3e50',
-            'glass': 'rgba(255, 255, 255, 0.1)'
+            'primary': '#1a1a2e',          # Ana koyu
+            'secondary': '#16213e',        # İkincil koyu  
+            'accent': '#e94560',           # Kırmızı vurgu
+            'gold': '#ffd700',             # Altın
+            'white': '#ffffff',            # Beyaz
+            'light_gray': '#f8f9fa',       # Açık gri
+            'dark_gray': '#2c3e50',        # Koyu gri
+            'glass': 'rgba(255, 255, 255, 0.12)',  # Glass efekt
+            'glass_dark': 'rgba(0, 0, 0, 0.2)',    # Koyu glass
+            'shadow_light': 'rgba(255, 255, 255, 0.1)',  # Açık gölge
+            'shadow_dark': 'rgba(0, 0, 0, 0.3)',         # Koyu gölge
+            'blue': '#3498db',             # Normal mavi
+            'green': '#00ff88',            # Yeşil
+            'orange': '#f39c12'            # Turuncu
         }
         
         self.setup_ui()
@@ -48,7 +54,7 @@ class ElegantVerticalEczaneApp(QMainWindow):
         # TAM EKRAN MODU - DİKEY
         self.show()  # Normal window önce
         
-        print("🎨 Elegant Vertical Pharmacy Monitor başlatıldı!")
+        print("🌟 Modern Glassmorphism Pharmacy Monitor başlatıldı!")
 
     def setup_ui(self):
         # Ana widget stack
@@ -66,61 +72,72 @@ class ElegantVerticalEczaneApp(QMainWindow):
         self.stacked_widget.addWidget(self.video_widget)
 
     def setup_pharmacy_ui(self):
-        """Dikey ekran için optimize edilmiş eczane UI - SCROLL AKTİF"""
+        """🎨 MODERN GLASSMORPHISM DESIGN - Dikey ekran optimize"""
         widget = self.pharmacy_widget
         
         # SCROLL AREA EKLE - ZORUNLU SCROLL
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # AsNeeded
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         
         # İÇERİK WİDGETİ - YETERLİ YÜKSEK
         content_widget = QWidget()
-        content_widget.setMinimumHeight(1400)  # Minimum yükseklik garanti
+        content_widget.setMinimumHeight(1400)
         layout = QVBoxLayout(content_widget)
-        layout.setSpacing(15)
-        layout.setContentsMargins(15, 15, 15, 15)  # Margin artırıldı
+        layout.setSpacing(20)  # Spacing artırıldı
+        layout.setContentsMargins(20, 20, 20, 20)  # Margin artırıldı
         
-        # ARKA PLAN
+        # 🌌 NORMAL BACKGROUND - MOR FESTIVAL İPTAL
         widget.setStyleSheet(f"""
             QWidget {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 {self.colors['primary']}, 
                     stop:0.3 {self.colors['secondary']}, 
                     stop:1 {self.colors['primary']});
-                font-family: 'Segoe UI', 'Arial', sans-serif;
+                font-family: 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', sans-serif;
             }}
             QScrollArea {{
                 border: none;
                 background: transparent;
             }}
             QScrollBar:vertical {{
-                background: transparent;
-                width: 8px;
-                border-radius: 4px;
+                background: rgba(255, 255, 255, 0.1);
+                width: 12px;
+                border-radius: 6px;
+                margin: 3px;
             }}
             QScrollBar::handle:vertical {{
-                background: {self.colors['gold']};
-                border-radius: 4px;
-                min-height: 20px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {self.colors['blue']}, 
+                    stop:1 {self.colors['accent']});
+                border-radius: 6px;
+                min-height: 30px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {self.colors['gold']}, 
+                    stop:1 {self.colors['accent']});
+                box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
             }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 background: transparent;
+                border: none;
             }}
         """)
         
-        # HEADER KOMPAKT
-        self.create_header(layout)
+        # HEADER - MODERN GLASSMORPHISM
+        self.create_modern_header(layout)
         
-        # ECZANE BİLGİLERİ
-        self.create_info_section(layout)
+        # ECZANE BİLGİLERİ - DEPTH CARD
+        self.create_modern_info_section(layout)
         
-        # QR + HARİTA YAN YANA
-        self.create_qr_map_section(layout)
+        # QR + HARİTA - FLOATING CARDS
+        self.create_modern_qr_map_section(layout)
         
-        # FOOTER
-        self.create_footer(layout)
+        # FOOTER - GLASS BOTTOM
+        self.create_modern_footer(layout)
         
         # BOŞ ALAN EKLE - SCROLL İÇİN
         spacer = QWidget()
@@ -136,102 +153,163 @@ class ElegantVerticalEczaneApp(QMainWindow):
         main_widget_layout.setContentsMargins(0, 0, 0, 0)
         main_widget_layout.addWidget(scroll_area)
 
-    def create_header(self, layout):
-        """Kompakt header - BÜYÜTÜLMÜŞ"""
+    def create_modern_header(self, layout):
+        """🌟 MODERN GLASSMORPHISM HEADER - ADVANCED SHADOWS"""
         header = QWidget()
-        header.setFixedHeight(180)  # 140'tan 180'e
+        header.setFixedHeight(200)  # Biraz büyüttük
+        
+        # 🎨 ADVANCED GLASSMORPHISM STYLE
         header.setStyleSheet(f"""
-            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                stop:0 {self.colors['accent']}, 
-                stop:0.5 #ff6b6b, 
-                stop:1 {self.colors['accent']});
-            border-radius: 15px;
+            QWidget {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 rgba(255, 255, 255, 0.25), 
+                    stop:0.5 rgba(255, 255, 255, 0.15), 
+                    stop:1 rgba(255, 255, 255, 0.1));
+                border-radius: 25px;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+                /* 🌟 MULTIPLE LAYERED SHADOWS */
+                box-shadow: 
+                    /* Ana gölge */
+                    0 20px 40px rgba(0, 0, 0, 0.3),
+                    /* İç gölge - glassmorphism */
+                    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+                    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+                    /* Renkli glow */
+                    0 0 60px rgba(233, 69, 96, 0.2),
+                    /* Derinlik gölgesi */
+                    0 30px 60px rgba(102, 126, 234, 0.15);
+            }}
         """)
         
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(25, 20, 25, 20)
-        header_layout.setSpacing(20)
+        header_layout.setContentsMargins(30, 25, 30, 25)
+        header_layout.setSpacing(25)
         
-        # SOL: Logo + Başlık
+        # SOL: Logo + Başlık - FLOATING EFFECT
         left_widget = QWidget()
+        left_widget.setStyleSheet("background: transparent;")
         left_layout = QHBoxLayout(left_widget)
-        left_layout.setSpacing(20)
+        left_layout.setSpacing(25)
         
-        # Logo - BÜYÜTÜLMÜŞ
+        # 🔮 LOGO - GLASSMORPHISM CIRCLE
         self.logo_label = QLabel()
         self.load_logo()
         self.logo_label.setStyleSheet(f"""
-            color: {self.colors['white']};
-            background: {self.colors['glass']};
-            border-radius: 40px;  
-            padding: 20px;
-            border: 3px solid {self.colors['gold']};
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 rgba(255, 215, 0, 0.3),
+                stop:0.5 rgba(255, 255, 255, 0.2),
+                stop:1 rgba(233, 69, 96, 0.3));
+            border-radius: 45px;
+            padding: 25px;
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            /* 🌟 LOGO SHADOW EFFECTS */
+            box-shadow: 
+                0 15px 35px rgba(255, 215, 0, 0.4),
+                inset 0 2px 0 rgba(255, 255, 255, 0.6),
+                inset 0 -2px 0 rgba(0, 0, 0, 0.2),
+                0 0 30px rgba(255, 215, 0, 0.3);
         """)
         self.logo_label.setAlignment(Qt.AlignCenter)
-        self.logo_label.setFixedSize(80, 80)  # 70'ten 80'e
+        self.logo_label.setFixedSize(90, 90)
         left_layout.addWidget(self.logo_label)
         
-        # Başlık - BÜYÜTÜLMÜŞ
+        # ✨ BAŞLIK - TEXT SHADOW EFFECTS
         title_widget = QWidget()
+        title_widget.setStyleSheet("background: transparent;")
         title_layout = QVBoxLayout(title_widget)
-        title_layout.setSpacing(5)
+        title_layout.setSpacing(8)
         
         main_title = QLabel("KARŞIYAKA 4")
-        main_title.setFont(QFont('Segoe UI', 28, QFont.Bold))  # 24'ten 28'e
-        main_title.setStyleSheet(f"color: {self.colors['white']}; background: transparent;")
+        main_title.setFont(QFont('Segoe UI', 32, QFont.Bold))
+        main_title.setStyleSheet(f"""
+            color: {self.colors['white']};
+            background: transparent;
+            /* 🌟 TEXT SHADOW DEPTH */
+            text-shadow: 
+                2px 2px 4px rgba(0, 0, 0, 0.7),
+                0 0 15px rgba(255, 255, 255, 0.3),
+                0 0 30px rgba(233, 69, 96, 0.2);
+        """)
         title_layout.addWidget(main_title)
         
         sub_title = QLabel("NÖBETÇİ ECZANE")
-        sub_title.setFont(QFont('Segoe UI', 18, QFont.Bold))  # 16'dan 18'e
-        sub_title.setStyleSheet(f"color: {self.colors['gold']}; background: transparent;")
+        sub_title.setFont(QFont('Segoe UI', 20, QFont.Bold))
+        sub_title.setStyleSheet(f"""
+            color: {self.colors['gold']};
+            background: transparent;
+            text-shadow: 
+                1px 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 20px rgba(255, 215, 0, 0.4);
+        """)
         title_layout.addWidget(sub_title)
         
-        title_widget.setStyleSheet("background: transparent;")
         left_layout.addWidget(title_widget)
-        left_widget.setStyleSheet("background: transparent;")
         header_layout.addWidget(left_widget, 2)
         
-        # SAĞ: Saat + Hava - BÜYÜTÜLMÜŞ
+        # SAĞ: Saat + Hava - FLOATING CARDS
         right_widget = QWidget()
+        right_widget.setStyleSheet("background: transparent;")
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setSpacing(12)
+        right_layout.setSpacing(15)
         
-        # Saat - BÜYÜTÜLMÜŞ
+        # ⏰ SAAT - GLASSMORPHISM CARD
         self.time_label = QLabel()
-        self.time_label.setFont(QFont('Consolas', 20, QFont.Bold))  # 16'dan 20'e
+        self.time_label.setFont(QFont('SF Mono', 22, QFont.Bold))
         self.time_label.setStyleSheet(f"""
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 rgba(255, 255, 255, 0.2),
+                stop:1 rgba(255, 255, 255, 0.1));
             color: {self.colors['white']};
-            background: {self.colors['glass']};
-            border-radius: 10px;
-            padding: 12px 16px;
-            border: 2px solid {self.colors['gold']};
+            border-radius: 15px;
+            padding: 15px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            /* 🌟 TIME CARD SHADOWS */
+            box-shadow: 
+                0 10px 25px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4),
+                0 0 25px rgba(0, 210, 255, 0.2);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         """)
         self.time_label.setAlignment(Qt.AlignCenter)
         right_layout.addWidget(self.time_label)
         
-        # Hava durumu - BÜYÜTÜLMÜŞ
+        # 🌤️ HAVA DURUMU - FLOATING CARD
         weather_widget = QWidget()
         weather_widget.setStyleSheet(f"""
-            background: {self.colors['glass']};
-            border-radius: 10px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            padding: 12px;
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 rgba(255, 255, 255, 0.15),
+                stop:1 rgba(255, 255, 255, 0.05));
+            border-radius: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            padding: 15px;
+            /* 🌟 WEATHER CARD SHADOWS */
+            box-shadow: 
+                0 12px 30px rgba(0, 0, 0, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                0 0 20px rgba(52, 152, 219, 0.15);
         """)
         weather_layout = QHBoxLayout(weather_widget)
-        weather_layout.setSpacing(12)
+        weather_layout.setSpacing(15)
         
         self.weather_temp = QLabel("--°C")
-        self.weather_temp.setFont(QFont('Segoe UI', 20, QFont.Bold))  # 16'dan 20'e
-        self.weather_temp.setStyleSheet(f"color: {self.colors['gold']}; background: transparent;")
+        self.weather_temp.setFont(QFont('Segoe UI', 22, QFont.Bold))
+        self.weather_temp.setStyleSheet(f"""
+            color: {self.colors['gold']};
+            background: transparent;
+            text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+        """)
         weather_layout.addWidget(self.weather_temp)
         
         self.weather_desc = QLabel("Yükleniyor...")
-        self.weather_desc.setFont(QFont('Segoe UI', 14))  # 10'dan 14'e
-        self.weather_desc.setStyleSheet(f"color: {self.colors['white']}; background: transparent;")
+        self.weather_desc.setFont(QFont('Segoe UI', 16))
+        self.weather_desc.setStyleSheet(f"""
+            color: {self.colors['white']};
+            background: transparent;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        """)
         weather_layout.addWidget(self.weather_desc)
         
         right_layout.addWidget(weather_widget)
-        right_widget.setStyleSheet("background: transparent;")
         header_layout.addWidget(right_widget, 1)
         
         layout.addWidget(header)
@@ -242,76 +320,128 @@ class ElegantVerticalEczaneApp(QMainWindow):
         self.time_timer.start(1000)
         self.update_time()
 
-    def create_info_section(self, layout):
-        """Eczane bilgileri bölümü - KÜÇÜLTÜLMÜŞ"""
+    def create_modern_info_section(self, layout):
+        """💎 MODERN INFO SECTION - DEPTH GLASSMORPHISM"""
         info_container = QWidget()
         info_container.setStyleSheet(f"""
-            background: {self.colors['glass']};
-            border-radius: 15px;
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(255, 255, 255, 0.2),
+                stop:0.5 rgba(255, 255, 255, 0.1),
+                stop:1 rgba(255, 255, 255, 0.05));
+            border-radius: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            /* 🌟 ADVANCED INFO CARD SHADOWS */
+            box-shadow: 
+                /* Ana derinlik gölgesi */
+                0 25px 50px rgba(0, 0, 0, 0.3),
+                /* İç ışıltı */
+                inset 0 2px 0 rgba(255, 255, 255, 0.4),
+                inset 0 -2px 0 rgba(0, 0, 0, 0.15),
+                /* Renkli glow efektler */
+                0 0 40px rgba(233, 69, 96, 0.15),
+                0 0 80px rgba(102, 126, 234, 0.1),
+                /* Backdrop blur simulation */
+                0 30px 80px rgba(0, 0, 0, 0.2);
         """)
         
         info_layout = QVBoxLayout(info_container)
-        info_layout.setContentsMargins(20, 12, 20, 12)
-        info_layout.setSpacing(8)
+        info_layout.setContentsMargins(25, 20, 25, 20)
+        info_layout.setSpacing(15)
         
-        # Başlık
+        # 🏷️ BAŞLIK - NEON EFFECT
         title = QLabel("📍 NÖBETÇİ ECZANE BİLGİLERİ")
-        title.setFont(QFont('Segoe UI', 16, QFont.Bold))  # 18'den 16'ya
+        title.setFont(QFont('Segoe UI', 18, QFont.Bold))
         title.setStyleSheet(f"""
             color: {self.colors['gold']};
-            background: transparent;
-            padding: 6px;
-            border-bottom: 2px solid {self.colors['accent']};
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                stop:0 rgba(255, 215, 0, 0.1),
+                stop:0.5 rgba(233, 69, 96, 0.1),
+                stop:1 rgba(255, 215, 0, 0.1));
+            padding: 12px;
+            border-radius: 12px;
+            border: 2px solid rgba(255, 215, 0, 0.4);
+            /* 🌟 TITLE GLOW */
+            text-shadow: 
+                0 0 20px rgba(255, 215, 0, 0.8),
+                0 0 40px rgba(233, 69, 96, 0.3);
+            box-shadow: 
+                0 8px 20px rgba(255, 215, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
         """)
         title.setAlignment(Qt.AlignCenter)
         info_layout.addWidget(title)
         
-        # İçerik - KÜÇÜLTÜLMÜŞ
+        # 📄 İÇERİK - GLASSMORPHISM TEXT AREA
         self.info_label = QLabel("Yükleniyor...")
         self.info_label.setWordWrap(True)
-        self.info_label.setFont(QFont('Segoe UI', 13))  # 14'ten 13'e
+        self.info_label.setFont(QFont('Segoe UI', 14))
         self.info_label.setStyleSheet(f"""
             color: {self.colors['white']};
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            padding: 12px;
-            line-height: 1.4;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 rgba(255, 255, 255, 0.08),
+                stop:1 rgba(255, 255, 255, 0.03));
+            border-radius: 15px;
+            padding: 20px;
+            line-height: 1.6;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            /* 🌟 CONTENT AREA SHADOWS */
+            box-shadow: 
+                inset 0 2px 10px rgba(0, 0, 0, 0.1),
+                inset 0 -2px 10px rgba(255, 255, 255, 0.05),
+                0 5px 15px rgba(0, 0, 0, 0.1);
         """)
-        self.info_label.setMinimumHeight(160)  # 200'den 160'a
-        self.info_label.setMaximumHeight(180)  # 250'den 180'e
+        self.info_label.setMinimumHeight(180)
+        self.info_label.setMaximumHeight(200)
         info_layout.addWidget(self.info_label)
         
         layout.addWidget(info_container)
 
-    def create_qr_map_section(self, layout):
-        """QR + Harita yan yana - KÜÇÜLTÜLMÜŞ"""
+    def create_modern_qr_map_section(self, layout):
+        """🎯 FLOATING QR + MAP CARDS - ADVANCED GLASSMORPHISM"""
         row_widget = QWidget()
+        row_widget.setStyleSheet("background: transparent;")
         row_layout = QHBoxLayout(row_widget)
-        row_layout.setSpacing(12)
+        row_layout.setSpacing(20)
         
-        # QR Bölümü - KÜÇÜLTÜLMÜŞ
+        # 📱 QR FLOATING CARD
         qr_container = QWidget()
         qr_container.setStyleSheet(f"""
-            background: {self.colors['glass']};
-            border-radius: 15px;
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 rgba(255, 255, 255, 0.18),
+                stop:0.5 rgba(255, 255, 255, 0.12),
+                stop:1 rgba(255, 255, 255, 0.08));
+            border-radius: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            /* 🌟 QR CARD FLOATING SHADOWS */
+            box-shadow: 
+                /* Hover hazır floating effect */
+                0 20px 40px rgba(0, 0, 0, 0.25),
+                /* Glassmorphism depth */
+                inset 0 2px 0 rgba(255, 255, 255, 0.4),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+                /* QR specific glow */
+                0 0 30px rgba(52, 152, 219, 0.15),
+                /* Bottom depth */
+                0 25px 50px rgba(0, 0, 0, 0.15);
         """)
         
         qr_layout = QVBoxLayout(qr_container)
-        qr_layout.setContentsMargins(15, 15, 15, 15)
+        qr_layout.setContentsMargins(20, 20, 20, 20)
         qr_layout.setSpacing(0)
         
         self.qr_label = QLabel("QR\nYükleniyor...")
         self.qr_label.setAlignment(Qt.AlignCenter)
-        self.qr_label.setFixedSize(150, 150)  # 180'den 150'ye
+        self.qr_label.setFixedSize(160, 160)
         self.qr_label.setStyleSheet(f"""
             background: {self.colors['white']};
-            border-radius: 10px;
+            border-radius: 15px;
             color: {self.colors['dark_gray']};
-            font-size: 12px;
-            border: 2px solid {self.colors['gold']};
+            font-size: 14px;
+            border: 3px solid rgba(255, 215, 0, 0.6);
+            /* 🌟 QR CODE INNER SHADOW */
+            box-shadow: 
+                inset 0 3px 10px rgba(0, 0, 0, 0.1),
+                0 0 20px rgba(255, 215, 0, 0.3);
         """)
         
         qr_center_layout = QHBoxLayout()
@@ -322,67 +452,106 @@ class ElegantVerticalEczaneApp(QMainWindow):
         
         row_layout.addWidget(qr_container, 1)
         
-        # Harita Bölümü - KÜÇÜLTÜLMÜŞ
+        # 🗺️ MAP FLOATING CARD
         map_container = QWidget()
         map_container.setStyleSheet(f"""
-            background: {self.colors['glass']};
-            border-radius: 15px;
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                stop:0 rgba(255, 255, 255, 0.16),
+                stop:0.5 rgba(255, 255, 255, 0.10),
+                stop:1 rgba(255, 255, 255, 0.06));
+            border-radius: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            /* 🌟 MAP CARD FLOATING SHADOWS */
+            box-shadow: 
+                /* Ana floating gölge */
+                0 22px 45px rgba(0, 0, 0, 0.28),
+                /* Glassmorphism iç efekt */
+                inset 0 2px 0 rgba(255, 255, 255, 0.35),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+                /* Map specific glow */
+                0 0 35px rgba(52, 152, 219, 0.18),
+                /* Gradient shadow */
+                0 28px 55px rgba(52, 152, 219, 0.12);
         """)
         
         map_layout = QVBoxLayout(map_container)
-        map_layout.setContentsMargins(15, 15, 15, 15)
+        map_layout.setContentsMargins(20, 20, 20, 20)
         map_layout.setSpacing(0)
         
         self.map_label = QLabel("Harita yükleniyor...")
         self.map_label.setAlignment(Qt.AlignCenter)
-        self.map_label.setMinimumHeight(150)  # 180'den 150'ye
-        self.map_label.setMaximumHeight(170)  # 200'den 170'e
+        self.map_label.setMinimumHeight(160)
+        self.map_label.setMaximumHeight(180)
         self.map_label.setStyleSheet(f"""
             background: {self.colors['white']};
-            border-radius: 10px;
+            border-radius: 15px;
             color: {self.colors['dark_gray']};
-            font-size: 12px;
-            border: 2px solid {self.colors['gold']};
+            font-size: 14px;
+            border: 3px solid rgba(52, 152, 219, 0.4);
+            /* 🌟 MAP INNER EFFECTS */
+            box-shadow: 
+                inset 0 3px 10px rgba(0, 0, 0, 0.08),
+                0 0 25px rgba(52, 152, 219, 0.2);
         """)
         map_layout.addWidget(self.map_label)
         
         row_layout.addWidget(map_container, 2)
-        row_widget.setStyleSheet("background: transparent;")
         layout.addWidget(row_widget)
 
-    def create_footer(self, layout):
-        """Kompakt footer"""
+    def create_modern_footer(self, layout):
+        """🌊 FLOATING FOOTER - GLASSMORPHISM"""
         footer = QWidget()
-        footer.setFixedHeight(50)
+        footer.setFixedHeight(60)
         footer.setStyleSheet(f"""
             background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                stop:0 {self.colors['dark_gray']}, 
-                stop:0.5 {self.colors['secondary']}, 
-                stop:1 {self.colors['dark_gray']});
-            border-radius: 15px;
+                stop:0 rgba(255, 255, 255, 0.12),
+                stop:0.5 rgba(255, 255, 255, 0.08),
+                stop:1 rgba(255, 255, 255, 0.12));
+            border-radius: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            /* 🌟 FOOTER FLOATING SHADOWS */
+            box-shadow: 
+                /* Subtle floating */
+                0 15px 30px rgba(0, 0, 0, 0.2),
+                /* Glassmorphism depth */
+                inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+                /* Soft glow */
+                0 0 30px rgba(255, 255, 255, 0.1);
         """)
         
         footer_layout = QHBoxLayout(footer)
-        footer_layout.setContentsMargins(20, 10, 20, 10)
+        footer_layout.setContentsMargins(25, 15, 25, 15)
         
         self.last_update_label = QLabel("Son güncelleme: --:--")
-        self.last_update_label.setFont(QFont('Segoe UI', 12))
-        self.last_update_label.setStyleSheet(f"color: {self.colors['white']}; background: transparent;")
+        self.last_update_label.setFont(QFont('Segoe UI', 13))
+        self.last_update_label.setStyleSheet(f"""
+            color: {self.colors['white']};
+            background: transparent;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+        """)
         footer_layout.addWidget(self.last_update_label)
         
         footer_layout.addStretch()
         
         status_label = QLabel("● SİSTEM AKTİF")
-        status_label.setFont(QFont('Segoe UI', 12, QFont.Bold))
-        status_label.setStyleSheet("color: #00ff00; background: transparent;")
+        status_label.setFont(QFont('Segoe UI', 13, QFont.Bold))
+        status_label.setStyleSheet("""
+            color: #00ff88;
+            background: transparent;
+            text-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
+        """)
         footer_layout.addWidget(status_label)
         
         footer_layout.addStretch()
         
-        powered_label = QLabel("Powered by AI")
-        powered_label.setFont(QFont('Segoe UI', 10))
-        powered_label.setStyleSheet(f"color: {self.colors['white']}; background: transparent;")
+        powered_label = QLabel("✨ Powered by AI")
+        powered_label.setFont(QFont('Segoe UI', 11))
+        powered_label.setStyleSheet(f"""
+            color: {self.colors['white']};
+            background: transparent;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+        """)
         footer_layout.addWidget(powered_label)
         
         layout.addWidget(footer)
@@ -396,18 +565,18 @@ class ElegantVerticalEczaneApp(QMainWindow):
                 if os.path.exists(path):
                     pixmap = QPixmap(path)
                     if not pixmap.isNull():
-                        scaled_logo = pixmap.scaled(70, 70, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        scaled_logo = pixmap.scaled(80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                         self.logo_label.setPixmap(scaled_logo)
                         logo_loaded = True
                         print(f"✅ Logo yüklendi: {path}")
                         break
             if not logo_loaded:
                 self.logo_label.setText("🏥")
-                self.logo_label.setFont(QFont('Segoe UI', 40))
+                self.logo_label.setFont(QFont('Segoe UI', 45))
                 print("📋 Logo bulunamadı, emoji kullanıldı")
         except Exception as e:
             self.logo_label.setText("🏥")
-            self.logo_label.setFont(QFont('Segoe UI', 40))
+            self.logo_label.setFont(QFont('Segoe UI', 45))
             print(f"⚠️ Logo hatası: {e}")
 
     def update_time(self):
@@ -469,10 +638,105 @@ class ElegantVerticalEczaneApp(QMainWindow):
             self.media_player.play()
 
     def setup_timers(self):
-        """Timer kurulum"""
+        """Timer kurulum - NÖBET SAATLERİ İLE"""
+        # Eczane bilgileri güncelleme - 30 dakika
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.fetch_data)
         self.update_timer.start(1800000)  # 30 dakika
+
+        # 🕐 NÖBET SAATLERİ KONTROLÜ - HER DAKİKA
+        self.schedule_timer = QTimer()
+        self.schedule_timer.timeout.connect(self.check_schedule_and_switch)
+        self.schedule_timer.start(60000)  # 60 saniye - dakika kontrolü
+        
+        print("⏰ Nöbet saatleri kontrolü aktif: 18:45-08:45")
+
+    def check_schedule_and_switch(self):
+        """🕐 NÖBET SAATLERİ KONTROLÜ VE MOD DEĞİŞİMİ"""
+        now = datetime.now()
+        current_time = now.time()
+        current_day = now.weekday()  # 0=Pazartesi, 6=Pazar
+        
+        # ⏰ NÖBET SAATLERİ: 18:45 - 08:45 + PAZAR TÜM GÜN
+        is_night_shift = (
+            current_time >= datetime.strptime("18:45", "%H:%M").time() or
+            current_time <= datetime.strptime("08:45", "%H:%M").time()
+        )
+        
+        is_sunday = (current_day == 6)  # Pazar günü
+        
+        # 🏥 NÖBET ZAMANI KONTROLÜ
+        should_show_pharmacy = is_night_shift or is_sunday
+        
+        if should_show_pharmacy and self.current_mode != "pharmacy":
+            print(f"🏥 NÖBET MODUNA GEÇİYOR - Saat: {now.strftime('%H:%M')} {'(PAZAR)' if is_sunday else '(GECE NÖBETİ)'}")
+            self.switch_to_pharmacy_mode()
+            
+        elif not should_show_pharmacy and self.current_mode != "video":
+            print(f"🎬 REKLAM MODUNA GEÇİYOR - Saat: {now.strftime('%H:%M')} (NORMAL MESAI)")
+            self.switch_to_video_mode()
+            
+        # Status indicator güncelle
+        self.update_status_indicator(should_show_pharmacy, is_sunday)
+
+    def update_status_indicator(self, is_pharmacy_time, is_sunday):
+        """🟢 STATUS INDICATOR GÜNCELLE"""
+        if hasattr(self, 'status_label'):
+            if is_sunday:
+                self.status_label.setText("🟢 PAZAR NÖBETÇİSİ")
+                self.status_label.setStyleSheet("""
+                    color: #00ff88;
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 rgba(0, 255, 136, 0.2),
+                        stop:1 rgba(0, 255, 136, 0.1));
+                    border: 2px solid rgba(0, 255, 136, 0.4);
+                    border-radius: 15px;
+                    padding: 8px 15px;
+                    font-weight: bold;
+                    text-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
+                    /* 💚 PULSE ANİMASYON */
+                    animation: pulse 2s ease-in-out infinite alternate;
+                """)
+            elif is_pharmacy_time:
+                self.status_label.setText("🟢 ŞU ANDA NÖBETÇİ")
+                self.status_label.setStyleSheet("""
+                    color: #00ff88;
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 rgba(0, 255, 136, 0.2),
+                        stop:1 rgba(0, 255, 136, 0.1));
+                    border: 2px solid rgba(0, 255, 136, 0.4);
+                    border-radius: 15px;
+                    padding: 8px 15px;
+                    font-weight: bold;
+                    text-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
+                """)
+            else:
+                self.status_label.setText("⚪ REKLAM ZAMANI")
+                self.status_label.setStyleSheet("""
+                    color: #cccccc;
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 2px solid rgba(255, 255, 255, 0.3);
+                    border-radius: 15px;
+                    padding: 8px 15px;
+                    font-weight: bold;
+                    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+                """)
+
+    def switch_to_video_mode(self):
+        """🎬 Video moduna geç"""
+        self.current_mode = "video"
+        self.stacked_widget.setCurrentWidget(self.video_widget)
+        
+        if self.video_path and os.path.exists(self.video_path):
+            self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(os.path.abspath(self.video_path))))
+            self.media_player.play()
+            self.no_video_label.hide()
+            self.video_widget_display.show()
+            print(f"▶️ Video oynatılıyor: {self.video_path}")
+        else:
+            self.video_widget_display.hide()
+            self.no_video_label.show()
+            print("❌ Video bulunamadı - ads/ klasörü kontrol edin")
 
     def switch_to_pharmacy_mode(self):
         """Eczane moduna geç"""
@@ -529,27 +793,36 @@ class ElegantVerticalEczaneApp(QMainWindow):
                     # Mesafe ve süre
                     distance, duration = self.get_route_info(end_lat, end_lon)
                     
-                    # HTML formatında bilgi
+                    # 🎨 MODERN HTML formatında bilgi - GLASSMORPHISM STYLE
                     info_html = f"""
                     <div style='line-height: 1.8; font-size: 16px;'>
-                    <p style='color: {self.colors['gold']}; font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 15px;'>
+                    <p style='color: {self.colors['gold']}; font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 20px; text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);'>
                     ✨ {name} ✨
                     </p>
-                    <p style='color: {self.colors['white']}; margin: 10px 0;'>
-                    📞 <strong>Tel:</strong> {phone}
+                    
+                    <div style='background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 15px; margin: 10px 0; border: 1px solid rgba(255, 255, 255, 0.1);'>
+                    <p style='color: {self.colors['white']}; margin: 8px 0; text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);'>
+                    📞 <strong style='color: {self.colors['blue']};'>Tel:</strong> {phone}
                     </p>
-                    <p style='color: {self.colors['white']}; margin: 10px 0;'>
-                    📍 <strong>Adres:</strong><br>{address}
+                    </div>
+                    
+                    <div style='background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 15px; margin: 10px 0; border: 1px solid rgba(255, 255, 255, 0.1);'>
+                    <p style='color: {self.colors['white']}; margin: 8px 0; text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);'>
+                    📍 <strong style='color: {self.colors['orange']};'>Adres:</strong><br>{address}
                     </p>
-                    <p style='color: {self.colors['white']}; margin: 10px 0;'>
-                    🏢 <strong>Bölge:</strong> KARŞIYAKA 4
-                    </p>
-                    <hr style='border: 1px solid {self.colors['accent']}; margin: 15px 0;'>
-                    <p style='color: {self.colors['gold']}; margin: 10px 0;'>
+                    </div>
+                    
+                    <div style='background: rgba(233, 69, 96, 0.1); border-radius: 12px; padding: 15px; margin: 15px 0; border: 2px solid rgba(233, 69, 96, 0.3);'>
+                    <p style='color: {self.colors['gold']}; margin: 8px 0; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);'>
                     🚗 <strong>Mesafe:</strong> {distance}
                     </p>
-                    <p style='color: {self.colors['gold']}; margin: 10px 0;'>
+                    <p style='color: {self.colors['gold']}; margin: 8px 0; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);'>
                     ⏱️ <strong>Süre:</strong> {duration}
+                    </p>
+                    </div>
+                    
+                    <p style='color: {self.colors['blue']}; text-align: center; font-weight: bold; margin: 15px 0; text-shadow: 0 0 12px rgba(52, 152, 219, 0.4);'>
+                    🏢 KARŞIYAKA 4 BÖLGE
                     </p>
                     </div>
                     """
@@ -570,11 +843,14 @@ class ElegantVerticalEczaneApp(QMainWindow):
                     print("✅ Eczane bilgileri güncellendi")
                     return
             
-            # Bulunamadı
+            # Bulunamadı - MODERN STYLE
             self.info_label.setText(f"""
-            <div style='text-align: center; color: {self.colors['white']}; font-size: 18px;'>
-            <p style='color: {self.colors['accent']}; font-size: 24px; margin-bottom: 20px;'>⚠️</p>
-            <p>Bugün KARŞIYAKA 4'te nöbetçi eczane bulunamadı</p>
+            <div style='text-align: center; padding: 30px;'>
+            <p style='color: {self.colors['accent']}; font-size: 32px; margin-bottom: 20px; text-shadow: 0 0 20px rgba(233, 69, 96, 0.6);'>⚠️</p>
+            <p style='color: {self.colors['white']}; font-size: 18px; text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);'>Bugün KARŞIYAKA 4'te nöbetçi eczane bulunamadı</p>
+            <div style='background: rgba(233, 69, 96, 0.1); border-radius: 15px; padding: 20px; margin: 20px 0; border: 2px solid rgba(233, 69, 96, 0.3);'>
+            <p style='color: {self.colors['gold']}; font-size: 16px; text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);'>Lütfen daha sonra tekrar kontrol edin</p>
+            </div>
             </div>
             """)
             
@@ -583,9 +859,12 @@ class ElegantVerticalEczaneApp(QMainWindow):
             
         except Exception as e:
             self.info_label.setText(f"""
-            <div style='text-align: center; color: {self.colors['accent']}; font-size: 18px;'>
-            <p style='font-size: 24px; margin-bottom: 20px;'>❌</p>
-            <p>Hata: {str(e)}</p>
+            <div style='text-align: center; padding: 30px;'>
+            <p style='color: {self.colors['accent']}; font-size: 28px; margin-bottom: 20px; text-shadow: 0 0 15px rgba(233, 69, 96, 0.6);'>❌</p>
+            <p style='color: {self.colors['white']}; font-size: 16px; text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);'>Hata: {str(e)}</p>
+            <div style='background: rgba(233, 69, 96, 0.1); border-radius: 12px; padding: 15px; margin: 15px 0; border: 1px solid rgba(233, 69, 96, 0.3);'>
+            <p style='color: {self.colors['gold']}; text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);'>Bağlantı sorunu yaşanıyor</p>
+            </div>
             </div>
             """)
             
@@ -620,7 +899,7 @@ class ElegantVerticalEczaneApp(QMainWindow):
         return "~2 km", "~5 dakika"
 
     def create_route_map(self, end_lat, end_lon):
-        """Harita oluştur"""
+        """🗺️ MODERN Harita oluştur"""
         try:
             directions_url = (
                 f"https://maps.googleapis.com/maps/api/directions/json?"
@@ -648,16 +927,25 @@ class ElegantVerticalEczaneApp(QMainWindow):
                     else:
                         zoom_level = 14
                     
-                    # Harita boyutları - KÜÇÜLTÜLMÜŞ
+                    # 🎨 MODERN MAP STYLE - DARK THEME
                     map_width = 480
-                    map_height = 150
+                    map_height = 160
                     
                     static_map_url = (
                         f"https://maps.googleapis.com/maps/api/staticmap?"
                         f"size={map_width}x{map_height}&"
-                        f"markers=color:green|size:mid|label:K|{self.start_lat},{self.start_lon}&"
-                        f"markers=color:red|size:mid|label:E|{end_lat},{end_lon}&"
-                        f"path=color:0xe94560|weight:4|enc:{polyline}&"
+                        f"maptype=roadmap&"
+                        f"style=feature:all|element:geometry|color:0x212121&"
+                        f"style=feature:all|element:labels.icon|visibility:off&"
+                        f"style=feature:all|element:labels.text.fill|color:0x757575&"
+                        f"style=feature:all|element:labels.text.stroke|color:0x212121&"
+                        f"style=feature:road|element:geometry|color:0x2c2c2c&"
+                        f"style=feature:road|element:geometry.stroke|color:0x212121&"
+                        f"style=feature:road|element:labels.text.fill|color:0x9ca5b3&"
+                        f"style=feature:water|element:geometry|color:0x17263c&"
+                        f"markers=color:0x00ff88|size:mid|label:K|{self.start_lat},{self.start_lon}&"
+                        f"markers=color:0xe94560|size:mid|label:E|{end_lat},{end_lon}&"
+                        f"path=color:0xffd700|weight:5|enc:{polyline}&"
                         f"zoom={zoom_level}&"
                         f"key={self.api_key}"
                     )
@@ -669,19 +957,25 @@ class ElegantVerticalEczaneApp(QMainWindow):
                         pixmap = QPixmap()
                         pixmap.loadFromData(map_response.content)
                         
-                        scaled_pixmap = pixmap.scaled(480, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        scaled_pixmap = pixmap.scaled(480, 160, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                         self.map_label.setPixmap(scaled_pixmap)
                         
-                        print("✅ Harita oluşturuldu")
+                        print("✅ Modern dark theme harita oluşturuldu")
                         return
                         
         except Exception as e:
             print(f"Harita hatası: {e}")
             
-        self.map_label.setText("Harita yüklenemedi")
+        self.map_label.setText("🗺️ Harita yüklenemedi")
+        self.map_label.setStyleSheet(f"""
+            background: {self.colors['glass']};
+            color: {self.colors['white']};
+            font-size: 16px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        """)
 
     def fetch_weather_data(self):
-        """Hava durumu çek"""
+        """🌤️ Hava durumu çek"""
         try:
             print("🌡️ Hava durumu alınıyor...")
             url = f"http://api.openweathermap.org/data/2.5/weather"
@@ -710,12 +1004,13 @@ class ElegantVerticalEczaneApp(QMainWindow):
             print(f"Hava durumu hatası: {e}")
 
     def create_qr_code(self, url):
-        """QR kod oluştur"""
+        """📱 QR kod oluştur"""
         try:
             qr = qrcode.QRCode(version=1, box_size=10, border=4)
             qr.add_data(url)
             qr.make(fit=True)
             
+            # 🎨 MODERN QR DESIGN
             qr_img = qr.make_image(fill_color=self.colors['primary'], back_color=self.colors['white'])
             
             buffer = BytesIO()
@@ -725,13 +1020,19 @@ class ElegantVerticalEczaneApp(QMainWindow):
             pixmap = QPixmap()
             pixmap.loadFromData(buffer.getvalue())
             
-            scaled_pixmap = pixmap.scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            scaled_pixmap = pixmap.scaled(160, 160, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.qr_label.setPixmap(scaled_pixmap)
             
             print("✅ QR kodu oluşturuldu")
             
         except Exception as e:
-            self.qr_label.setText(f"QR\nHatası:\n{str(e)}")
+            self.qr_label.setText(f"📱\nQR Hatası")
+            self.qr_label.setStyleSheet(f"""
+                background: {self.colors['glass']};
+                color: {self.colors['white']};
+                font-size: 14px;
+                text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+            """)
             print(f"QR kod hatası: {e}")
 
     def keyPressEvent(self, event):
@@ -745,22 +1046,25 @@ class ElegantVerticalEczaneApp(QMainWindow):
                 self.showFullScreen()
 
 if __name__ == "__main__":
-    print("🎨 Elegant Vertical Pharmacy Monitor")
-    print("=" * 60)
+    print("🌟 Modern Glassmorphism Pharmacy Monitor")
+    print("=" * 70)
     
     app = QApplication(sys.argv)
+    
+    # 🎨 MODERN FONT SETUP
     font = QFont("Segoe UI", 12)
     app.setFont(font)
     
     try:
         window = ElegantVerticalEczaneApp()
-        print("✅ Pencere oluşturuldu")
+        print("✅ Modern glassmorphism pencere oluşturuldu")
         print("📐 Dikey format: 720x1280")
-        print("🎨 Elegant tema aktif")
+        print("🌟 Advanced shadows & glassmorphism aktif")
+        print("🎨 Modern depth effects uygulandı")
         print("⌨️  ESC: Çıkış, F11: Tam ekran")
         print("🔄 30 dakikada otomatik güncelleme")
-        print("=" * 60)
-        print("🚀 ÇALIŞIYOR!")
+        print("=" * 70)
+        print("🚀 MODERN GLASSMORPHISM ÇALIŞIYOR!")
         
         app.exec_()
         
