@@ -177,7 +177,7 @@ class ModernCorporateEczaneApp(QMainWindow):
             border: none;
         """)
         self.logo_label.setAlignment(Qt.AlignCenter)
-        self.logo_label.setFixedSize(80, 80)
+        self.logo_label.setFixedSize(100, 100)  # 80x80'den 100x100'e büyütüldü
         left_layout.addWidget(self.logo_label)
         
         # BAŞLIK - CORPORATE TYPOGRAPHY
@@ -444,7 +444,7 @@ class ModernCorporateEczaneApp(QMainWindow):
                 if os.path.exists(path):
                     pixmap = QPixmap(path)
                     if not pixmap.isNull():
-                        scaled_logo = pixmap.scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        scaled_logo = pixmap.scaled(90, 90, Qt.KeepAspectRatio, Qt.SmoothTransformation)  # 80x80'den 90x90'e
                         self.logo_label.setPixmap(scaled_logo)
                         logo_loaded = True
                         print(f"✅ Logo yüklendi: {path}")
