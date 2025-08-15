@@ -16,8 +16,8 @@ class ModernCorporateEczaneApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("KARŞIYAKA 4 Nöbetçi Eczane - Modern Corporate")
         
-        # DİKEY MONİTÖR İÇİN BOYUTLAR
-        self.setFixedSize(720, 1280)
+        # DİKEY MONİTÖR İÇİN BOYUTLAR - GENİŞLETİLDİ
+        self.setFixedSize(900, 1280)  # 720'den 900'e genişletildi (+180px)
         
         # API anahtarları
         self.api_key = "AIzaSyCIG70KV9YFvAoxlbqm3LqN_dRfuWZj-eE"
@@ -123,7 +123,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         content_widget.setMinimumHeight(1400)
         layout = QVBoxLayout(content_widget)
         layout.setSpacing(24)
-        layout.setContentsMargins(32, 32, 32, 32)
+        layout.setContentsMargins(40, 32, 40, 32)  # Yan marginler artırıldı
         
         # 🎬 ANİMASYON SİSTEMLERİ ÖNCE SETUP ET
         self.setup_animations()
@@ -173,7 +173,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.load_logo()
         self.logo_label.setStyleSheet(f"""
             background: transparent;
-            border-radius: 40px;
+            border-radius: 50px;
             border: none;
         """)
         self.logo_label.setAlignment(Qt.AlignCenter)
@@ -252,7 +252,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         """)
         weather_layout.addWidget(self.weather_desc)
         
-        weather_widget.setMinimumHeight(60)  # Minimum yükseklik
+        weather_widget.setMinimumHeight(80)  # 60'tan 80'e büyütüldü
         right_layout.addWidget(weather_widget)
         header_layout.addWidget(right_widget, 1)
         
@@ -312,21 +312,30 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.info_label.setMaximumHeight(250)
         content_row_layout.addWidget(self.info_label, 2)  # 2/3 genişlik
         
-        # SAĞ: QR KOD (ÇİZGİSİZ)
+        # SAĞ: QR KOD (ÇİZGİSİZ VE HİZALI)
         qr_widget = QWidget()
         qr_widget.setStyleSheet("background: transparent;")
         qr_widget_layout = QVBoxLayout(qr_widget)
         qr_widget_layout.setSpacing(12)
+        qr_widget_layout.setContentsMargins(0, 0, 0, 0)  # Margin temizlendi
         
-        # QR TITLE
-        qr_title = QLabel("QR KOD")
-        qr_title.setFont(QFont('Segoe UI', 14, QFont.Bold))
+        # QR TITLE - HİZALI
+        qr_title = QLabel("YOL TARİFİ İÇİN\nQR OKUTUNUZ")
+        qr_title.setFont(QFont('Segoe UI', 12, QFont.Bold))
         qr_title.setAlignment(Qt.AlignCenter)
         qr_title.setStyleSheet(f"""
             color: {self.colors['text_secondary']};
             background: transparent;
+            padding: 8px;
         """)
         qr_widget_layout.addWidget(qr_title)
+        
+        # QR KOD - MÜKEMMEL HİZALAMA
+        qr_container = QWidget()
+        qr_container.setStyleSheet("background: transparent;")
+        qr_container_layout = QHBoxLayout(qr_container)
+        qr_container_layout.setContentsMargins(0, 0, 0, 0)
+        qr_container_layout.addStretch()  # Sol boşluk
         
         self.qr_label = QLabel("QR\nYükleniyor...")
         self.qr_label.setAlignment(Qt.AlignCenter)
@@ -339,7 +348,11 @@ class ModernCorporateEczaneApp(QMainWindow):
             font-size: 16px;
             font-weight: bold;
         """)
-        qr_widget_layout.addWidget(self.qr_label)
+        qr_container_layout.addWidget(self.qr_label)
+        qr_container_layout.addStretch()  # Sağ boşluk
+        
+        qr_widget_layout.addWidget(qr_container)
+        qr_widget_layout.addStretch()  # Alt boşluk
         
         content_row_layout.addWidget(qr_widget, 1)  # 1/3 genişlik
         
@@ -789,9 +802,9 @@ KARŞIYAKA 4 BÖLGE NÖBET ECZANESI
                     else:
                         zoom_level = 13  # Uzak
                     
-                    # BÜYÜK HARİTA İÇİN BOYUT
-                    map_width = 640   # Daha büyük
-                    map_height = 300  # Çok daha büyük
+                    # BÜYÜK HARİTA İÇİN BOYUT - GENİŞLETİLDİ
+                    map_width = 820   # 640'tan 820'ye (+180px)
+                    map_height = 300  # Aynı yükseklik
                     
                     static_map_url = (
                         f"https://maps.googleapis.com/maps/api/staticmap?"
@@ -823,7 +836,7 @@ KARŞIYAKA 4 BÖLGE NÖBET ECZANESI
                         pixmap = QPixmap()
                         pixmap.loadFromData(map_response.content)
                         
-                        scaled_pixmap = pixmap.scaled(640, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        scaled_pixmap = pixmap.scaled(820, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                         self.map_label.setPixmap(scaled_pixmap)
                         
                         print("✅ Corporate harita oluşturuldu")
@@ -931,7 +944,7 @@ if __name__ == "__main__":
     try:
         window = ModernCorporateEczaneApp()
         print("✅ Modern corporate tasarım oluşturuldu")
-        print("📐 Dikey format: 720x1280")
+        print("📐 Dikey format: 900x1280")  # Güncellendi
         print("🎨 Apple/Tesla tarzı clean design")
         print("🏢 Corporate color scheme")
         print("⌨️  ESC: Çıkış, F11: Tam ekran")
