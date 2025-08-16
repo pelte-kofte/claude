@@ -83,7 +83,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         widget.setStyleSheet(f"""
             QWidget {{
                 background-color: {self.colors['bg_primary']};
-                font-family: 'SF Pro Display', 'Segoe UI', 'Helvetica Neue', sans-serif;
+                font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
                 color: {self.colors['text_primary']};
             }}
         """)
@@ -129,7 +129,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.setup_animations()
         
         # SECTIONS
-        self.create_corporate_header(layout)
+        self.create_red_header(layout)
         self.create_corporate_info_section(layout)
         self.create_corporate_qr_map_section(layout)
         self.create_corporate_footer(layout)
@@ -146,58 +146,60 @@ class ModernCorporateEczaneApp(QMainWindow):
         main_widget_layout.setContentsMargins(0, 0, 0, 0)
         main_widget_layout.addWidget(scroll_area)
 
-    def create_corporate_header(self, layout):
-        """🏢 CORPORATE HEADER - Clean & Professional"""
+    def create_red_header(self, layout):
+        """🔴 KIRMIZI HEADER - DÜZELTİLMİŞ VERSİYON"""
         header = QWidget()
-        header.setFixedHeight(180)
+        header.setFixedHeight(140)  # 120'den 140'a yükseltildi
         header.setStyleSheet(f"""
             QWidget {{
-                background-color: {self.colors['bg_card']};
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #DC143C, stop:0.5 #B22222, stop:1 #8B0000);
                 border: none;
                 border-radius: 16px;
             }}
         """)
         
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(32, 24, 32, 24)
-        header_layout.setSpacing(32)
+        header_layout.setContentsMargins(24, 20, 24, 20)  # Sol/sağ margin azaltıldı
+        header_layout.setSpacing(20)  # Spacing azaltıldı
         
-        # SOL: Logo + Başlık
+        # SOL: Logo + Başlık - KOMPAKT
         left_widget = QWidget()
         left_widget.setStyleSheet("background: transparent;")
         left_layout = QHBoxLayout(left_widget)
-        left_layout.setSpacing(24)
+        left_layout.setSpacing(16)  # Spacing azaltıldı
         
-        # LOGO - TRANSPARENT BACKGROUND (ÇİZGİSİZ)
+        # LOGO - KÜÇÜK
         self.logo_label = QLabel()
         self.load_logo()
-        self.logo_label.setStyleSheet(f"""
+        self.logo_label.setStyleSheet("""
             background: transparent;
-            border-radius: 50px;
-            border: none;
+            border-radius: 35px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
         """)
         self.logo_label.setAlignment(Qt.AlignCenter)
-        self.logo_label.setFixedSize(100, 100)  # 80x80'den 100x100'e büyütüldü
+        self.logo_label.setFixedSize(70, 70)  # 80'den 70'e küçültüldü
         left_layout.addWidget(self.logo_label)
         
-        # BAŞLIK - CORPORATE TYPOGRAPHY
+        # BAŞLIK - KÜÇÜK FONT
         title_widget = QWidget()
         title_widget.setStyleSheet("background: transparent;")
         title_layout = QVBoxLayout(title_widget)
-        title_layout.setSpacing(8)
+        title_layout.setSpacing(4)
+        title_layout.setContentsMargins(0, 0, 0, 0)
         
         main_title = QLabel("KARŞIYAKA 4")
-        main_title.setFont(QFont('SF Pro Display', 36, QFont.Bold))
-        main_title.setStyleSheet(f"""
-            color: {self.colors['text_primary']};
+        main_title.setFont(QFont('Segoe UI', 26, QFont.Bold))  # 32'den 26'ya küçültüldü
+        main_title.setStyleSheet("""
+            color: white;
             background: transparent;
         """)
         title_layout.addWidget(main_title)
         
-        sub_title = QLabel("NÖBETÇİ ECZANE")
-        sub_title.setFont(QFont('SF Pro Display', 18, QFont.Medium))
-        sub_title.setStyleSheet(f"""
-            color: {self.colors['accent_blue']};
+        sub_title = QLabel("Nöbetçi Eczane Sistemi")
+        sub_title.setFont(QFont('Segoe UI', 13, QFont.Medium))  # 16'dan 13'e küçültüldü
+        sub_title.setStyleSheet("""
+            color: rgba(255, 255, 255, 0.9);
             background: transparent;
         """)
         title_layout.addWidget(sub_title)
@@ -205,55 +207,81 @@ class ModernCorporateEczaneApp(QMainWindow):
         left_layout.addWidget(title_widget)
         header_layout.addWidget(left_widget, 2)
         
-        # SAĞ: Saat + Hava
+        # SAĞ: Saat/Tarih + Sıcaklık - HİZALANMIŞ
         right_widget = QWidget()
         right_widget.setStyleSheet("background: transparent;")
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setSpacing(16)
+        right_layout.setSpacing(12)
+        right_layout.setContentsMargins(0, 8, 0, 8)  # Üst/alt padding
         
-        # SAAT - CORPORATE CARD (BÜYÜK)
-        self.time_label = QLabel()
-        self.time_label.setFont(QFont('SF Mono', 18, QFont.Medium))  # Font küçültüldü
-        self.time_label.setStyleSheet(f"""
-            background-color: {self.colors['bg_accent']};
-            color: {self.colors['text_primary']};
-            border: none;
-            border-radius: 12px;
-            padding: 12px;
-        """)
-        self.time_label.setAlignment(Qt.AlignCenter)
-        self.time_label.setMinimumHeight(80)  # Minimum yükseklik
-        right_layout.addWidget(self.time_label)
+        # ÜST: SAAT + TARİH YAN YANA - PERFECT HİZALAMA
+        datetime_row = QWidget()
+        datetime_row.setStyleSheet("background: transparent;")
+        datetime_row_layout = QHBoxLayout(datetime_row)
+        datetime_row_layout.setSpacing(8)
+        datetime_row_layout.setContentsMargins(0, 0, 0, 0)
+        datetime_row_layout.addStretch()  # Sağa yasla
         
-        # HAVA DURUMU - CORPORATE CARD (ÇİZGİSİZ)
-        weather_widget = QWidget()
-        weather_widget.setStyleSheet(f"""
-            background-color: {self.colors['bg_accent']};
-            border: none;
-            border-radius: 12px;
-        """)
-        weather_layout = QHBoxLayout(weather_widget)
-        weather_layout.setContentsMargins(12, 12, 12, 12)  # Padding küçültüldü
-        weather_layout.setSpacing(12)  # Spacing küçültüldü
-        
-        self.weather_temp = QLabel("--°C")
-        self.weather_temp.setFont(QFont('SF Pro Display', 18, QFont.Bold))  # Font küçültüldü
-        self.weather_temp.setStyleSheet(f"""
-            color: {self.colors['accent_orange']};
+        # SAAT
+        self.time_display = QLabel()
+        self.time_display.setFont(QFont('Segoe UI', 22, QFont.Bold))
+        self.time_display.setStyleSheet("""
+            color: white;
             background: transparent;
         """)
-        weather_layout.addWidget(self.weather_temp)
+        self.time_display.setAlignment(Qt.AlignRight)
+        datetime_row_layout.addWidget(self.time_display)
         
-        self.weather_desc = QLabel("Yükleniyor...")
-        self.weather_desc.setFont(QFont('SF Pro Display', 12, QFont.Medium))  # Font küçültüldü
-        self.weather_desc.setStyleSheet(f"""
-            color: {self.colors['text_secondary']};
+        # NOKTA - ORTADA
+        bullet = QLabel("•")
+        bullet.setFont(QFont('Segoe UI', 22, QFont.Bold))  # Aynı font size
+        bullet.setStyleSheet("""
+            color: rgba(255, 255, 255, 0.8);
             background: transparent;
         """)
-        weather_layout.addWidget(self.weather_desc)
+        bullet.setAlignment(Qt.AlignCenter)
+        datetime_row_layout.addWidget(bullet)
         
-        weather_widget.setMinimumHeight(80)  # 60'tan 80'e büyütüldü
-        right_layout.addWidget(weather_widget)
+        # TARİH
+        self.date_display = QLabel()
+        self.date_display.setFont(QFont('Segoe UI', 18, QFont.Medium))  # 20'den 18'e küçültüldü
+        self.date_display.setStyleSheet("""
+            color: rgba(255, 255, 255, 0.9);
+            background: transparent;
+        """)
+        self.date_display.setAlignment(Qt.AlignLeft)
+        datetime_row_layout.addWidget(self.date_display)
+        
+        right_layout.addWidget(datetime_row)
+        
+        # ALT: SICAKLIK + WEATHER ICON - HİZALANMIŞ
+        weather_row = QWidget()
+        weather_row.setStyleSheet("background: transparent;")
+        weather_row_layout = QHBoxLayout(weather_row)
+        weather_row_layout.setSpacing(8)
+        weather_row_layout.setContentsMargins(0, 0, 0, 0)
+        weather_row_layout.addStretch()  # Sağa yasla
+        
+        # WEATHER ICON
+        self.weather_icon = QLabel("☀")
+        self.weather_icon.setFont(QFont('Segoe UI', 18))  # 20'den 18'e küçültüldü
+        self.weather_icon.setStyleSheet("""
+            color: white;
+            background: transparent;
+        """)
+        self.weather_icon.setAlignment(Qt.AlignCenter)
+        weather_row_layout.addWidget(self.weather_icon)
+        
+        # SICAKLIK
+        self.weather_temp = QLabel("34°C")
+        self.weather_temp.setFont(QFont('Segoe UI', 18, QFont.Bold))  # 20'den 18'e küçültüldü
+        self.weather_temp.setStyleSheet("""
+            color: white;
+            background: transparent;
+        """)
+        weather_row_layout.addWidget(self.weather_temp)
+        
+        right_layout.addWidget(weather_row)
         header_layout.addWidget(right_widget, 1)
         
         layout.addWidget(header)
@@ -457,36 +485,39 @@ class ModernCorporateEczaneApp(QMainWindow):
                 if os.path.exists(path):
                     pixmap = QPixmap(path)
                     if not pixmap.isNull():
-                        scaled_logo = pixmap.scaled(90, 90, Qt.KeepAspectRatio, Qt.SmoothTransformation)  # 80x80'den 90x90'e
+                        scaled_logo = pixmap.scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)  # Logo küçültüldü
                         self.logo_label.setPixmap(scaled_logo)
                         logo_loaded = True
                         print(f"✅ Logo yüklendi: {path}")
                         break
             if not logo_loaded:
                 self.logo_label.setText("🏥")
-                self.logo_label.setFont(QFont('SF Pro Display', 32))
-                self.logo_label.setStyleSheet(f"""
+                self.logo_label.setFont(QFont('Segoe UI', 24))  # Emoji küçültüldü
+                self.logo_label.setStyleSheet("""
                     background: transparent;
-                    color: {self.colors['text_primary']};
-                    border-radius: 40px;
-                    border: 2px solid {self.colors['border_light']};
+                    color: white;
+                    border-radius: 35px;
+                    border: 2px solid rgba(255, 255, 255, 0.3);
                 """)
                 print("📋 Logo bulunamadı, emoji kullanıldı")
         except Exception as e:
             self.logo_label.setText("🏥")
-            self.logo_label.setFont(QFont('SF Pro Display', 32))
+            self.logo_label.setFont(QFont('Segoe UI', 28))
             print(f"⚠️ Logo hatası: {e}")
 
     def update_time(self):
-        """Saat güncelle"""
+        """Saat ve tarih güncelle - KIRMIZI HEADER İÇİN"""
         now = datetime.now()
-        time_str = now.strftime("%H:%M:%S")
+        time_str = now.strftime("%H:%M")
         date_str = now.strftime("%d.%m.%Y")
-        display_text = f"{time_str}\n{date_str}"
-        self.time_label.setText(display_text)
+        
+        if hasattr(self, 'time_display'):
+            self.time_display.setText(time_str)
+        if hasattr(self, 'date_display'):
+            self.date_display.setText(date_str)
 
     def setup_video_ui(self):
-        """Video UI"""
+        """Video UI - VİDEO SORUNU DÜZELTİLDİ"""
         widget = self.video_widget
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -496,16 +527,37 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.video_widget_display = QVideoWidget()
         layout.addWidget(self.video_widget_display)
         
-        self.no_video_label = QLabel("📺 ads/ klasöründe video bulunamadı")
+        # VİDEO BULUNAMADI MESAJI - DÜZELTİLDİ
+        self.no_video_label = QLabel()
         self.no_video_label.setAlignment(Qt.AlignCenter)
-        self.no_video_label.setFont(QFont('SF Pro Display', 32, QFont.Bold))
+        self.no_video_label.setFont(QFont('Segoe UI', 28, QFont.Bold))
         self.no_video_label.setStyleSheet(f"""
             background-color: {self.colors['bg_primary']};
             color: {self.colors['text_primary']};
             padding: 50px;
         """)
-        self.no_video_label.hide()
+        # Varsayılan mesaj
+        self.update_video_message()
         layout.addWidget(self.no_video_label)
+
+    def update_video_message(self):
+        """Video mesajını güncelle"""
+        if not self.video_path:
+            message = """📺 REKLAM MODU
+            
+ads/ klasöründe video dosyası bulunamadı.
+
+Desteklenen formatlar:
+• MP4 (.mp4)
+• MOV (.mov) 
+• AVI (.avi)
+
+Video eklemek için ads/ klasörüne
+video dosyası koyun."""
+        else:
+            message = "🎬 Video yükleniyor..."
+            
+        self.no_video_label.setText(message)
 
     def setup_video_player(self):
         """Video player kurulum"""
@@ -639,7 +691,6 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.stacked_widget.setCurrentWidget(self.video_widget)
         
         if self.video_path and os.path.exists(self.video_path):
-            self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(os.path.abspath(self.video_path))))
             self.media_player.play()
             self.no_video_label.hide()
             self.video_widget_display.show()
@@ -791,16 +842,21 @@ KARŞIYAKA 4 BÖLGE NÖBET ECZANESI
                     route = directions_data['routes'][0]
                     polyline = route['overview_polyline']['points']
                     
-                    # Zoom seviyesi - DAHA YAKIN GÖRÜNÜM
+                    # ZOOM ÇOK DAHA YAKIN - SOKAK SEVİYESİ
                     distance_value = route['legs'][0]['distance']['value']
-                    if distance_value < 1000:
-                        zoom_level = 16  # Çok yakın
-                    elif distance_value < 2000:
+                    
+                    if distance_value < 500:  # 500m altı
+                        zoom_level = 19  # Maksimum yakın
+                    elif distance_value < 800:  # 800m altı  
+                        zoom_level = 18  # Çok yakın
+                    elif distance_value < 1200:  # 1.2km altı
+                        zoom_level = 17  # Yakın sokak
+                    elif distance_value < 2000:  # 2km altı (SENİN DURUMUN)
+                        zoom_level = 16  # ÇOOK DAHA YAKIN!
+                    elif distance_value < 3000:  # 3km altı
                         zoom_level = 15  # Yakın
-                    elif distance_value < 3000:
-                        zoom_level = 14  # Orta
                     else:
-                        zoom_level = 13  # Uzak
+                        zoom_level = 14  # Normal
                     
                     # BÜYÜK HARİTA İÇİN BOYUT - GENİŞLETİLDİ
                     map_width = 820   # 640'tan 820'ye (+180px)
@@ -852,12 +908,12 @@ KARŞIYAKA 4 BÖLGE NÖBET ECZANESI
             background-color: {self.colors['bg_secondary']};
             color: {self.colors['text_secondary']};
             font-size: 16px;
-            border: 2px solid {self.colors['border_light']};
+            border: none;
             border-radius: 12px;
         """)
 
     def fetch_weather_data(self):
-        """Hava durumu çek"""
+        """🌤️ Hava durumu çek + BASİT EMOJI ICON"""
         try:
             print("🌡️ Hava durumu alınıyor...")
             url = f"http://api.openweathermap.org/data/2.5/weather"
@@ -874,16 +930,60 @@ KARŞIYAKA 4 BÖLGE NÖBET ECZANESI
             
             temp = round(data['main']['temp'])
             desc = data['weather'][0]['description'].title()
+            weather_main = data['weather'][0]['main'].lower()
+            
+            # 🌟 BASİT EMOJI WEATHER ICON
+            weather_emoji = self.get_weather_emoji(weather_main, temp)
             
             self.weather_temp.setText(f"{temp}°C")
-            self.weather_desc.setText(desc)
+            self.weather_icon.setText(weather_emoji)
             
-            print(f"✅ Hava durumu: {temp}°C - {desc}")
+            print(f"✅ Hava durumu: {temp}°C - {desc} - {weather_emoji}")
             
         except Exception as e:
             self.weather_temp.setText("--°C")
-            self.weather_desc.setText("Hata")
+            self.weather_icon.setText("❓")
             print(f"Hava durumu hatası: {e}")
+
+    def get_weather_emoji(self, weather_main, temp):
+        """🌟 BASİT EMOJI WEATHER ICONS"""
+        
+        # 🌞 GÜNEŞ DURUMLARI
+        if weather_main in ['clear', 'sunny']:
+            if temp >= 30:
+                return "🔥"  # Çok sıcak
+            elif temp >= 25:
+                return "☀"   # Sıcak
+            else:
+                return "🌤"   # Ilık
+                
+        # ☁️ BULUTLU DURUMLAR
+        elif weather_main in ['clouds', 'partly cloudy']:
+            return "☁"
+                
+        # 🌧️ YAĞMUR DURUMLARI
+        elif weather_main in ['rain', 'drizzle']:
+            return "🌧"
+            
+        # ⛈️ FIRTINA
+        elif weather_main in ['thunderstorm', 'storm']:
+            return "⚡"
+            
+        # 🌫️ SİS/DUMAN
+        elif weather_main in ['mist', 'fog', 'haze']:
+            return "🌫"
+            
+        # ❄️ KAR
+        elif weather_main in ['snow']:
+            return "❄"
+            
+        # 🌪️ RÜZGAR
+        elif weather_main in ['wind']:
+            return "💨"
+            
+        # DEFAULT
+        else:
+            return "🌈"
 
     def create_qr_code(self, url):
         """QR kod oluştur"""
@@ -914,7 +1014,7 @@ KARŞIYAKA 4 BÖLGE NÖBET ECZANESI
                 color: {self.colors['bg_primary']};
                 font-size: 16px;
                 font-weight: bold;
-                border: 2px solid {self.colors['border_light']};
+                border: none;
                 border-radius: 12px;
             """)
             print(f"QR kod hatası: {e}")
@@ -936,21 +1036,19 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     
     # CORPORATE FONT SETUP
-    font = QFont("SF Pro Display", 12)
-    if not font.exactMatch():
-        font = QFont("Segoe UI", 12)
+    font = QFont("Segoe UI", 12)
     app.setFont(font)
     
     try:
         window = ModernCorporateEczaneApp()
         print("✅ Modern corporate tasarım oluşturuldu")
-        print("📐 Dikey format: 900x1280")  # Güncellendi
-        print("🎨 Apple/Tesla tarzı clean design")
-        print("🏢 Corporate color scheme")
+        print("📐 Dikey format: 900x1280")
+        print("🔴 Kırmızı header - Saat/Tarih yan yana")
+        print("🎨 Segoe UI font family")
         print("⌨️  ESC: Çıkış, F11: Tam ekran")
         print("🔄 30 dakikada otomatik güncelleme")
         print("=" * 50)
-        print("🚀 CORPORATE DESIGN ÇALIŞIYOR!")
+        print("🚀 KIRMIZI HEADER ÇALIŞIYOR!")
         
         app.exec_()
         
