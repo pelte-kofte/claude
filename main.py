@@ -453,8 +453,12 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         bullet = QLabel("•")
         bullet.setFont(QFont('Segoe UI', 18, QFont.Bold))
-        bullet.setStyleSheet("color: rgba(255, 255, 255, 0.8); background: transparent;")
-        bullet.setAlignment(Qt.AlignCenter)
+        bullet.setStyleSheet("""
+        color: rgba(255, 255, 255, 0.8); 
+        background: transparent;
+        padding-bottom: 15px;
+        """)
+        bullet.setAlignment(Qt.AlignCenter | Qt.AlignVCenter)
         datetime_row_layout.addWidget(bullet)
         
         self.date_display = QLabel()
