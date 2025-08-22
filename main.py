@@ -265,23 +265,6 @@ class ModernCorporateEczaneApp(QMainWindow):
             print(f"❌ BÜYÜK Lottie yükleme hatası: {e}")
             return False
 
-    # HEADER'DAKİ WEATHER ROW'U DA GÜNCELLE:
-            # HTTP LOTTIE WEATHER ROW - BÜYÜK BOYUT
-            weather_row = QWidget()
-            weather_row.setFixedHeight(50)  # 30 → 50 (daha yüksek)
-            weather_row.setStyleSheet("background: transparent;")
-            weather_row_layout = QHBoxLayout(weather_row)
-            weather_row_layout.setSpacing(12)  # 8 → 12 (daha geniş)
-            weather_row_layout.setContentsMargins(0, 0, 0, 0)
-            weather_row_layout.addStretch()
-            
-            # BÜYÜK LOTTIE WIDGET
-            weather_row_layout.addWidget(self.lottie_widget)
-            
-            self.weather_temp = QLabel("--°C")
-            self.weather_temp.setFont(QFont('Segoe UI', 18, QFont.Bold))  # 16 → 18 (büyük)
-            self.weather_temp.setStyleSheet("color: white; background: transparent;")
-            weather_row_layout.addWidget(self.weather_temp)
     def load_svg_icon(self, icon_path, size=24):
         """🎨 SVG İkon Yükleyici"""
         try:
