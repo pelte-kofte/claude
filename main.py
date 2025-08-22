@@ -519,6 +519,7 @@ class ModernCorporateEczaneApp(QMainWindow):
     def create_svg_info_section(self, layout):
         """📋 SVG İKONLU INFO SECTION"""
         info_container = QWidget()
+        info_container.setFixedHeight(400)
         info_container.setStyleSheet(f"""
             background-color: {self.colors['bg_card']};
             border: none;
@@ -528,7 +529,6 @@ class ModernCorporateEczaneApp(QMainWindow):
         info_layout = QVBoxLayout(info_container)
         info_layout.setContentsMargins(32, 24, 32, 24)
         info_layout.setSpacing(20)
-        
         title = QLabel("NÖBETÇİ ECZANE BİLGİLERİ")
         title.setFont(QFont('Segoe UI', 20, QFont.Bold))
         title.setStyleSheet(f"""
@@ -736,8 +736,8 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         self.map_label = QLabel()
         self.map_label.setAlignment(Qt.AlignCenter)
-        self.map_label.setMinimumHeight(300)
-        self.map_label.setMaximumHeight(350)
+        self.map_label.setMinimumHeight(570)
+        self.map_label.setMaximumHeight(570)
         self.map_label.setStyleSheet(f"""
             background-color: {self.colors['bg_secondary']};
             border: none;
@@ -772,7 +772,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         footer_layout.addStretch()
         
-        self.status_label = QLabel(f"● HTTP SERVER ({self.server_port})")
+        self.status_label = QLabel("● Powered by AI")
         self.status_label.setFont(QFont('Segoe UI', 14, QFont.Bold))
         self.status_label.setStyleSheet(f"""
             color: {self.colors['accent_green']};
@@ -1162,7 +1162,7 @@ video dosyası koyun."""
                         zoom_level = 14
                     
                     map_width = 820
-                    map_height = 300
+                    map_height = 550
                     
                     static_map_url = (
                         f"https://maps.googleapis.com/maps/api/staticmap?"
@@ -1192,7 +1192,7 @@ video dosyası koyun."""
                         pixmap = QPixmap()
                         pixmap.loadFromData(map_response.content)
                         
-                        scaled_pixmap = pixmap.scaled(820, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        scaled_pixmap = pixmap.scaled(820, 550, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                         self.map_label.setPixmap(scaled_pixmap)
                         
                         print("✅ HTTP Server harita oluşturuldu")
