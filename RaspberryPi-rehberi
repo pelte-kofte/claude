@@ -1,0 +1,93 @@
+🛒 Raspberry Pi Alım Rehberi
+1. Hangi Model? (Nöbetçi Eczane Projesi için)
+Raspberry Pi 5 (ÖNERİLEN)
+✅ 8GB RAM model al (4GB'lik de olur ama 8GB güvenli)
+✅ ARM Cortex-A76 CPU (4 çekirdek)
+✅ PyQt5 + WebEngine için yeterli güç
+✅ Dual 4K HDMI çıkışı
+✅ WiFi 6 desteği
+✅ Fiyat: ~$100-120 (8GB model)
+Raspberry Pi 4 (Alternatif)
+⚠️ 8GB model zorunlu
+⚠️ Biraz daha yavaş ama yeterli
+⚠️ Fiyat: ~$80-100
+2. Nereden Alınır? (Türkiye)
+Resmi Distribütörler:
+
+RS Components Türkiye: rscomponents.com/tr
+Farnell/Element14: tr.farnell.com
+Direnc.net: direnc.net (Türkiye'den)
+Robotistan: robotistan.com
+
+Hızlı Alternatifler:
+
+Amazon.com.tr: Prime ile hızlı teslimat
+Trendyol/Hepsiburada: Yerel satıcılar
+
+3. Gerekli Aksesüarlar
+Zorunlular:
+📦 Raspberry Pi 5 (8GB) - ~₺3,500
+📦 MicroSD Kart 64GB (SanDisk Extreme) - ~₺300
+📦 Resmi Pi 5 Güç Adaptörü (27W USB-C) - ~₺350
+📦 Micro HDMI to HDMI Kablo - ~₺100
+📦 Case/Kutu (Fan'lı) - ~₺200
+Opsiyoneller:
+📦 Heatsink Kit - ~₺150
+📦 GPIO Kablolar - ~₺50
+📦 Breadboard - ~₺50
+4. Toplam Maliyet Hesabı
+Pi 5 (8GB):        ₺3,500
+MicroSD 64GB:      ₺300
+Güç Adaptörü:      ₺350
+HDMI Kablo:        ₺100
+Fan'lı Case:       ₺200
+─────────────────────
+TOPLAM:            ₺4,450
+5. Hazır Kit Alternatifleri
+🎁 Raspberry Pi 5 Starter Kit
+- Pi 5, SD Kart, Adaptör, Case dahil
+- Fiyat: ~₺4,000-4,500
+- Robotistan, Direnc.net'te mevcut
+6. Alım Önerileri
+En İyi Seçenek:
+bash# Robotistan'dan al (Türkiye garantili)
+- Raspberry Pi 5 8GB Kit
+- Hızlı kargo (1-2 gün)
+- Türkçe destek
+- Link: robotistan.com
+Budget Friendly:
+bash# Pi 4 8GB + aksesüarlar
+- Toplam ~₺3,500
+- Performans yeterli olacak
+7. Sipariş Verirken Dikkat Et
+✅ Kontrol Listesi:
+
+ 8GB RAM model seçtim
+ Resmi güç adaptörü aldım (çok önemli!)
+ Class 10 MicroSD kart aldım
+ Fan'lı case aldım (sıcaklık için)
+ Micro HDMI kablo aldım
+
+❌ Kaçınılacaklar:
+
+Çakma güç adaptörleri (Pi bozabilir)
+Yavaş SD kartlar (Class 4 vs.)
+Fan'sız ucuz kutular
+4GB RAM modeller (yetersiz)
+
+8. Siparişten Sonra
+Pi gelince önce test edelim:
+bash# İlk kurulum
+1. Raspberry Pi OS flash et
+2. SSH enable et
+3. WiFi ayarla
+4. Uzaktan bağlanabildiğini test et
+5. Python + PyQt5 test et
+9. Geçici Çözüm (Pi gelene kadar)
+Pi gelene kadar projeyi kendi bilgisayarında test edebilirsin:
+bash# Windows'ta test için
+pip install PyQt5
+python main.py
+
+# Tam ekran test
+python main.py --fullscreen
