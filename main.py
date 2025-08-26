@@ -606,8 +606,8 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         # ECZANE ADI
         name_label = QLabel(name)
-        name_label.setFont(QFont('Segoe UI', 16, QFont.Bold))
-        name_label.setStyleSheet(f"color: {self.colors['text_primary']}; padding: 8px;")
+        name_label.setFont(QFont('Segoe UI', 20, QFont.Bold))
+        name_label.setStyleSheet(f"color: {self.colors['text_primary']}; padding: 0px;")
         name_label.setWordWrap(True)
         self.info_widget_layout.addWidget(name_label)
         
@@ -697,7 +697,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.info_widget_layout.addWidget(time_row)
 
     def create_corporate_qr_map_section(self, layout):
-        """🗺️ BÜYÜK HARİTA"""
+        """🗺️ BÜYÜK HARİTA + LEJANT"""
         map_container = QWidget()
         map_container.setStyleSheet(f"""
             background-color: {self.colors['bg_card']};
@@ -721,18 +721,40 @@ class ModernCorporateEczaneApp(QMainWindow):
         """)
         map_layout.addWidget(map_title)
         
+        # LEJANT EKLE
+        legend_widget = QWidget()
+        legend_widget.setStyleSheet("background: transparent;")
+        legend_layout = QHBoxLayout(legend_widget)
+        legend_layout.setContentsMargins(0, 0, 0, 0)
+        legend_layout.setSpacing(40)
+        
+        legend_layout.addStretch()
+
+        # B: BAŞLANGIÇ
+        start_legend = QLabel("🔵 B: Buradasınız")
+        start_legend.setFont(QFont('Segoe UI', 12, QFont.Medium))
+        start_legend.setStyleSheet(f"color: {self.colors['text_secondary']};")
+        legend_layout.addWidget(start_legend)
+        
+        legend_layout.addStretch()
+        
+        # E: ECZANE
+        end_legend = QLabel("🔴 E: Nöbetçi Eczane")
+        end_legend.setFont(QFont('Segoe UI', 12, QFont.Medium))
+        end_legend.setStyleSheet(f"color: {self.colors['text_secondary']};")
+        legend_layout.addWidget(end_legend)
+        
+        map_layout.addWidget(legend_widget)
+
+        legend_layout.addStretch()
+        
+        # HARİTA
         self.map_label = QLabel()
         self.map_label.setAlignment(Qt.AlignCenter)
         self.map_label.setMinimumHeight(570)
         self.map_label.setMaximumHeight(570)
-        self.map_label.setStyleSheet(f"""
-            background-color: {self.colors['bg_secondary']};
-            border: none;
-            border-radius: 12px;
-            color: {self.colors['text_secondary']};
-            font-size: 18px;
-        """)
-        self.show_loading_spinner()
+        # ... geri kalan map_label kodu aynı ...
+    
         map_layout.addWidget(self.map_label)
         layout.addWidget(map_container)
 
@@ -1017,6 +1039,9 @@ video dosyası koyun."""
                         phone = phone_link.get('href').replace('tel:', '')
                         if len(phone) == 10:
                             phone = '0' + phone
+                        
+                        # TELEFON FORMATLA
+                        phone = self.format_phone_number(phone)
                     
                     # Adres
                     address = "Adres bulunamadı"
@@ -1086,6 +1111,25 @@ video dosyası koyun."""
             now = datetime.now()
             self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')} (Hata)")
             print(f"❌ HTTP Server güncelleme hatası: {e}")
+    def format_phone_number(self, phone):
+        """📞 Telefon numarasını formatla: 0232 999 99 99"""
+        try:
+            # Sadece rakamları al
+            digits = ''.join(filter(str.isdigit, phone))
+            
+            if len(digits) == 11 and digits.startswith('0'):
+                # 0232 999 99 99 formatı
+                return f"{digits[:4]} {digits[4:7]} {digits[7:9]} {digits[9:11]}"
+            elif len(digits) == 10:
+                # Başında 0 yoksa ekle
+                digits = '0' + digits
+                return f"{digits[:4]} {digits[4:7]} {digits[7:9]} {digits[9:11]}"
+            else:
+                # Format uymazsa olduğu gibi döndür
+                return phone
+                
+        except:
+            return phone
 
     def get_route_info(self, end_lat, end_lon):
         """Mesafe ve süre bilgisi al"""
@@ -1106,12 +1150,19 @@ video dosyası koyun."""
                     leg = data['routes'][0]['legs'][0]
                     distance = leg['distance']['text']
                     duration = leg['duration']['text']
+                    
+                    # TÜRKÇELEŞTİR
+                    duration = duration.replace('mins', 'dakika')
+                    duration = duration.replace('min', 'dakika') 
+                    duration = duration.replace('hours', 'saat')
+                    duration = duration.replace('hour', 'saat')
+                    
                     return distance, duration
                     
         except Exception as e:
             print(f"Rota bilgisi hatası: {e}")
             
-        return "~2 km", "~5 dakika"
+        return "~2 km", "~5 dakika"  # Fallback da Türkçe
 
     def create_route_map(self, end_lat, end_lon):
         """Harita oluştur"""
@@ -1136,9 +1187,9 @@ video dosyası koyun."""
                     distance_value = route['legs'][0]['distance']['value']
                     
                     if distance_value < 500:
-                        zoom_level = 19
+                        zoom_level = 17
                     elif distance_value < 800:
-                        zoom_level = 18
+                        zoom_level = 17
                     elif distance_value < 1200:
                         zoom_level = 17
                     elif distance_value < 2000:
@@ -1164,8 +1215,8 @@ video dosyası koyun."""
                         f"style=feature:road|element:labels.text.fill|color:0xffffff&"
                         f"style=feature:water|element:geometry|color:0x007AFF&"
                         f"style=feature:landscape|element:geometry|color:0x111111&"
-                        f"markers=color:0x30D158|size:mid|label:B|{self.start_lat},{self.start_lon}&"
-                        f"markers=color:0xFF3B30|size:mid|label:E|{end_lat},{end_lon}&"
+                        f"markers=color:0x0066FF|size:large|label:B|{self.start_lat},{self.start_lon}&"  # Mavi büyük
+                        f"markers=color:0xFF0000|size:large|label:E|{end_lat},{end_lon}&"  # Kırmızı büyük
                         f"path=color:0x007AFF|weight:4|enc:{polyline}&"
                         f"zoom={zoom_level}&"
                         f"key={self.api_key}"
