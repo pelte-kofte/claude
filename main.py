@@ -23,11 +23,209 @@ import http.server
 import socketserver
 import time
 
+
+# ============================================================================
+# 🔄 WORKER THREAD - ANA THREAD'İ DONDURMAMAK İÇİN
+# ============================================================================
+class DataFetchWorker(QThread):
+    """🔄 Arka planda veri çeken worker thread"""
+    
+    # Sinyaller - UI güncellemesi için
+    pharmacy_data_ready = pyqtSignal(dict)
+    weather_data_ready = pyqtSignal(dict)
+    map_data_ready = pyqtSignal(dict)  # bytes değil dict - mesafe/süre bilgisi de var
+    error_occurred = pyqtSignal(str)
+    
+    def __init__(self, task_type, **kwargs):
+        super().__init__()
+        self.task_type = task_type
+        self.kwargs = kwargs
+        
+    def run(self):
+        """Thread'de çalışacak kod"""
+        try:
+            if self.task_type == "pharmacy":
+                self.fetch_pharmacy_data()
+            elif self.task_type == "weather":
+                self.fetch_weather_data()
+            elif self.task_type == "map":
+                self.fetch_map_data()
+        except Exception as e:
+            self.error_occurred.emit(str(e))
+    
+    def fetch_pharmacy_data(self):
+        """📡 Eczane verisi çek"""
+        try:
+            url = "https://www.izmireczaciodasi.org.tr/nobetci-eczaneler"
+            r = requests.get(url, timeout=15)
+            soup = BeautifulSoup(r.text, 'html.parser')
+            
+            h4_elements = soup.find_all('h4', class_='red')
+            
+            for h4 in h4_elements:
+                strong = h4.find('strong')
+                if strong and 'KARŞIYAKA 4' in strong.text.upper():
+                    name = strong.text.strip()
+                    parent_div = h4.parent
+                    
+                    # Telefon
+                    phone = "Bulunamadı"
+                    phone_link = parent_div.find('a', href=lambda x: x and 'tel:' in x)
+                    if phone_link:
+                        phone = phone_link.get('href').replace('tel:', '')
+                        if len(phone) == 10:
+                            phone = '0' + phone
+                    
+                    # Adres
+                    address = "Adres bulunamadı"
+                    address_icon = parent_div.find('i', class_='fa fa-home main-color')
+                    if address_icon and address_icon.next_sibling:
+                        address = address_icon.next_sibling.strip()
+                    
+                    # Google Maps URL
+                    maps_link = parent_div.find('a', href=lambda x: x and 'google.com/maps' in x)
+                    maps_url = maps_link.get('href') if maps_link else None
+                    
+                    # Koordinatlar
+                    end_lat, end_lon = 38.473137, 27.113438
+                    if maps_url and 'q=' in maps_url:
+                        try:
+                            coords = maps_url.split('q=')[1].split('&')[0]
+                            end_lat, end_lon = map(float, coords.split(','))
+                        except:
+                            pass
+                    
+                    # Veriyi gönder
+                    data = {
+                        'found': True,
+                        'name': name,
+                        'phone': phone,
+                        'address': address,
+                        'maps_url': maps_url,
+                        'end_lat': end_lat,
+                        'end_lon': end_lon
+                    }
+                    self.pharmacy_data_ready.emit(data)
+                    return
+            
+            # Bulunamadı
+            self.pharmacy_data_ready.emit({'found': False})
+            
+        except Exception as e:
+            self.error_occurred.emit(f"Eczane verisi hatası: {e}")
+    
+    def fetch_weather_data(self):
+        """🌤️ Hava durumu çek"""
+        try:
+            api_key = self.kwargs.get('api_key')
+            url = f"http://api.openweathermap.org/data/2.5/weather"
+            params = {
+                'q': 'Izmir,TR',
+                'appid': api_key,
+                'units': 'metric',
+                'lang': 'tr'
+            }
+            
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            result = {
+                'temp': round(data['main']['temp']),
+                'description': data['weather'][0]['description'].title(),
+                'weather_main': data['weather'][0]['main'].lower()
+            }
+            self.weather_data_ready.emit(result)
+            
+        except Exception as e:
+            self.error_occurred.emit(f"Hava durumu hatası: {e}")
+    
+    def fetch_map_data(self):
+        """🗺️ Harita verisi çek"""
+        try:
+            api_key = self.kwargs.get('api_key')
+            start_lat = self.kwargs.get('start_lat')
+            start_lon = self.kwargs.get('start_lon')
+            end_lat = self.kwargs.get('end_lat')
+            end_lon = self.kwargs.get('end_lon')
+            
+            # Directions API
+            directions_url = (
+                f"https://maps.googleapis.com/maps/api/directions/json?"
+                f"origin={start_lat},{start_lon}&"
+                f"destination={end_lat},{end_lon}&"
+                f"mode=driving&"
+                f"key={api_key}"
+            )
+            
+            directions_response = requests.get(directions_url, timeout=15)
+            
+            if directions_response.status_code == 200:
+                directions_data = directions_response.json()
+                
+                if directions_data['status'] == 'OK':
+                    route = directions_data['routes'][0]
+                    polyline = route['overview_polyline']['points']
+                    
+                    # Mesafe ve süre
+                    leg = route['legs'][0]
+                    distance = leg['distance']['text']
+                    duration = leg['duration']['text']
+                    
+                    # Türkçeleştir
+                    duration = duration.replace('mins', 'dakika').replace('min', 'dakika')
+                    duration = duration.replace('hours', 'saat').replace('hour', 'saat')
+                    
+                    map_width = 820
+                    map_height = 550
+                    
+                    # Static Map URL - ZOOM YOK, OTOMATİK FIT
+                    # Google Maps markers ve path'e göre otomatik zoom yapar
+                    static_map_url = (
+                        f"https://maps.googleapis.com/maps/api/staticmap?"
+                        f"size={map_width}x{map_height}&"
+                        f"maptype=roadmap&"
+                        f"visible={start_lat},{start_lon}|{end_lat},{end_lon}&"
+                        f"style=feature:all|element:geometry|color:0x1a1a1a&"
+                        f"style=feature:all|element:labels.icon|visibility:off&"
+                        f"style=feature:all|element:labels.text.fill|color:0xcccccc&"
+                        f"style=feature:all|element:labels.text.stroke|color:0x000000&"
+                        f"style=feature:road|element:geometry|color:0x333333&"
+                        f"style=feature:road|element:geometry.stroke|color:0x222222&"
+                        f"style=feature:road|element:labels.text.fill|color:0xffffff&"
+                        f"style=feature:water|element:geometry|color:0x007AFF&"
+                        f"style=feature:landscape|element:geometry|color:0x111111&"
+                        f"markers=color:blue|size:mid|label:B|{start_lat},{start_lon}&"
+                        f"markers=color:red|size:mid|label:E|{end_lat},{end_lon}&"
+                        f"path=color:0x007AFF|weight:5|enc:{polyline}&"
+                        f"key={api_key}"
+                    )
+                    
+                    map_response = requests.get(static_map_url, timeout=15)
+                    
+                    if map_response.status_code == 200:
+                        # Harita + mesafe/süre bilgisini gönder
+                        result = {
+                            'map_data': map_response.content,
+                            'distance': distance,
+                            'duration': duration
+                        }
+                        self.map_data_ready.emit(result)
+                        return
+            
+            self.error_occurred.emit("Harita oluşturulamadı")
+            
+        except Exception as e:
+            self.error_occurred.emit(f"Harita hatası: {e}")
+
+
+# ============================================================================
+# 🌐 CORS HTTP SERVER
+# ============================================================================
 class CORSHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     """🌐 CORS BYPASS HANDLER"""
     
     def end_headers(self):
-        """CORS Header'larını ekle"""
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', '*')
@@ -35,13 +233,21 @@ class CORSHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
     
     def do_OPTIONS(self):
-        """OPTIONS request handler"""
         self.send_response(200)
         self.end_headers()
+    
+    def log_message(self, format, *args):
+        """HTTP loglarını gizle"""
+        pass
+
+
+# ============================================================================
+# 🏥 ANA UYGULAMA
+# ============================================================================
 class ModernCorporateEczaneApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("KARŞIYAKA 4 Nöbetçi Eczane - HTTP Server + Lottie")
+        self.setWindowTitle("KARŞIYAKA 4 Nöbetçi Eczane")
         
         # DİKEY MONİTÖR İÇİN BOYUTLAR
         self.setFixedSize(900, 1280)
@@ -49,14 +255,25 @@ class ModernCorporateEczaneApp(QMainWindow):
         # 🌐 LOCAL HTTP SERVER BAŞLAT
         self.start_local_server()
         
-        # API anahtarları
-        self.api_key = "AIzaSyCIG70KV9YFvAoxlbqm3LqN_dRfuWZj-eE"
-        self.weather_api_key = "b0d1be7721b4967d8feb810424bd9b6f"
+        # API anahtarları - Environment variable'dan al (güvenlik için)
+        self.api_key = os.environ.get('GOOGLE_MAPS_KEY', "AIzaSyCIG70KV9YFvAoxlbqm3LqN_dRfuWZj-eE")
+        self.weather_api_key = os.environ.get('OPENWEATHER_KEY', "b0d1be7721b4967d8feb810424bd9b6f")
+        
+        # Başlangıç koordinatları (Eczanenin konumu)
         self.start_lat = 38.47434762293852
         self.start_lon = 27.112356625119595
         
+        # Eczane koordinatları (güncellenecek)
+        self.end_lat = None
+        self.end_lon = None
+        
         self.current_mode = None
         self.video_path = None
+        
+        # Worker thread referansları
+        self.pharmacy_worker = None
+        self.weather_worker = None
+        self.map_worker = None
         
         # 🎨 MODERN CORPORATE RENK PALETİ
         self.colors = {
@@ -84,7 +301,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.switch_to_pharmacy_mode()
         
         self.show()
-        print("🎬 HTTP Server + Lottie Animations başlatıldı!")
+        print("🎬 Uygulama başlatıldı!")
 
     def start_local_server(self):
         """🌐 CORS BYPASS HTTP SERVER"""
@@ -94,76 +311,56 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         def run_server():
             try:
-                # Çalışma dizinini ayarla
                 current_dir = os.path.dirname(os.path.abspath(__file__))
                 os.chdir(current_dir)
-                print(f"📁 CORS Server dizini: {current_dir}")
+                print(f"📁 Server dizini: {current_dir}")
                 
-                # CORS HTTP server oluştur
                 handler = CORSHTTPRequestHandler
                 
-                # Port kontrolü
                 for port in range(8000, 8010):
                     try:
                         with socketserver.TCPServer(("", port), handler) as httpd:
                             self.server_port = port
                             self.server_url = f"http://localhost:{port}"
-                            print(f"🌐 CORS HTTP Server başlatıldı: {self.server_url}")
-                            
-                            # Server hazır sinyali
+                            print(f"🌐 HTTP Server: {self.server_url}")
                             self.server_ready = True
-                            
-                            # Server'ı çalıştır
                             httpd.serve_forever()
                             break
                     except OSError:
-                        print(f"⚠️ Port {port} kullanımda, {port+1} deneniyor...")
                         continue
                         
             except Exception as e:
-                print(f"❌ CORS Server hatası: {e}")
-                self.server_url = None
+                print(f"❌ Server hatası: {e}")
                 self.server_ready = False
         
-        # Server'ı thread'de başlat
         server_thread = threading.Thread(target=run_server, daemon=True)
         server_thread.start()
         
-        # Server'ın hazır olmasını bekle
-        QTimer.singleShot(2000, self.check_server_ready)
+        QTimer.singleShot(1500, self.check_server_ready)
 
     def check_server_ready(self):
-        """🔍 SERVER HAZIR KONTROLÜ"""
+        """Server hazır kontrolü"""
         if self.server_ready:
-            print("✅ HTTP Server hazır - Lottie animasyonları yüklenebilir!")
+            print("✅ HTTP Server hazır!")
         else:
-            print("⏳ Server henüz hazır değil, 1 saniye daha bekleniyor...")
-            QTimer.singleShot(1000, self.check_server_ready)
+            QTimer.singleShot(500, self.check_server_ready)
 
     def setup_lottie_weather(self):
-        """🎬 BÜYÜK BOYUTTA LOTTIE SİSTEMİ"""
+        """🎬 LOTTIE SİSTEMİ"""
         self.lottie_widget = QWebEngineView()
-        
-        # BÜYÜK BOYUT - GÖRÜNÜR ANİMASYON
-        self.lottie_widget.setFixedSize(40, 40)  # 22x22 → 40x40
+        self.lottie_widget.setFixedSize(40, 40)
         
         self.lottie_widget.setStyleSheet("""
-        QWebEngineView {
-            background: transparent !important;
-            background-color: rgba(0, 0, 0, 0) !important;
-            border: none;
-        }
+            QWebEngineView {
+                background: transparent !important;
+                border: none;
+            }
         """)
-        # WebEngine sayfası şeffaf
-        page = self.lottie_widget.page()
-        page.setBackgroundColor(QColor(0, 0, 0, 0))  # Tamamen şeffaf
-    
-     # Console gizle
-        page.javaScriptConsoleMessage = lambda *args: None
-        # Console mesajlarını gizle
-        self.lottie_widget.page().javaScriptConsoleMessage = lambda *args: None
         
-        # Lottie dosya yolları
+        page = self.lottie_widget.page()
+        page.setBackgroundColor(QColor(0, 0, 0, 0))
+        page.javaScriptConsoleMessage = lambda *args: None
+        
         self.lottie_files = {
             'sunny': 'weather_lottie/sun.json',
             'hot': 'weather_lottie/sun_hot.json',
@@ -177,24 +374,17 @@ class ModernCorporateEczaneApp(QMainWindow):
             'mist': 'weather_lottie/fog.json',
             'wind': 'weather_lottie/wind.json',
         }
-        
-        print("🎬 BÜYÜK Lottie sistemi kuruldu (40x40)")
 
     def load_lottie_animation(self, weather_main, temp=25):
-        """🌈 BÜYÜK BOYUTTA LOTTIE YÜKLE"""
+        """🌈 LOTTIE YÜKLE"""
         try:
             if not self.server_ready:
-                print("⏳ Server henüz hazır değil, emoji kullanılıyor")
                 return False
             
-            # Hava durumuna göre dosya seç
             lottie_file = None
             
             if weather_main in ['clear', 'sunny']:
-                if temp >= 30:
-                    lottie_file = self.lottie_files.get('hot') or self.lottie_files.get('sunny')
-                else:
-                    lottie_file = self.lottie_files.get('sunny')
+                lottie_file = self.lottie_files.get('hot') if temp >= 30 else self.lottie_files.get('sunny')
             elif weather_main in ['rain']:
                 lottie_file = self.lottie_files.get('rain')
             elif weather_main in ['drizzle']:
@@ -210,59 +400,33 @@ class ModernCorporateEczaneApp(QMainWindow):
             elif weather_main in ['wind']:
                 lottie_file = self.lottie_files.get('wind')
             
-            # Dosya kontrolü
             if lottie_file and os.path.exists(lottie_file):
-                # HTTP URL oluştur
                 http_url = f"{self.server_url}/{lottie_file}"
                 
                 html_content = f"""
                 <!DOCTYPE html>
                 <html style="background: transparent;">
-            <head>
-                <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
-                <style>
-                    * {{
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        background: transparent !important;
-                        background-color: transparent !important;
-                    }}
-                    html, body {{
-                        background: transparent !important;
-                        background-color: transparent !important;
-                        overflow: hidden;
-                    }}
-                    lottie-player {{
-                        width: 36px !important;
-                        height: 36px !important;
-                        background: transparent !important;
-                        background-color: transparent !important;
-                    }}
-                </style>
-            </head>
-            <body style="background: transparent !important;">
-                <lottie-player 
-                    src="{http_url}" 
-                    background="transparent" 
-                    speed="1" 
-                    loop 
-                    autoplay
-                    style="background: transparent !important;">
-                </lottie-player>
-            </body>
-            </html>
-            """
+                <head>
+                    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+                    <style>
+                        * {{ margin: 0 !important; padding: 0 !important; background: transparent !important; }}
+                        html, body {{ background: transparent !important; overflow: hidden; }}
+                        lottie-player {{ width: 36px !important; height: 36px !important; background: transparent !important; }}
+                    </style>
+                </head>
+                <body style="background: transparent !important;">
+                    <lottie-player src="{http_url}" background="transparent" speed="1" loop autoplay></lottie-player>
+                </body>
+                </html>
+                """
                 
                 self.lottie_widget.setHtml(html_content)
-                print(f"🎬 BÜYÜK Lottie yüklendi: {http_url} (36x36)")
                 return True
                 
-            else:
-                print(f"❌ Lottie dosyası bulunamadı: {lottie_file}")
-                return False
+            return False
                 
         except Exception as e:
-            print(f"❌ BÜYÜK Lottie yükleme hatası: {e}")
+            print(f"❌ Lottie hatası: {e}")
             return False
 
     def load_svg_icon(self, icon_path, size=24):
@@ -272,13 +436,9 @@ class ModernCorporateEczaneApp(QMainWindow):
                 svg_widget = QSvgWidget(icon_path)
                 svg_widget.setFixedSize(size, size)
                 svg_widget.setStyleSheet("background: transparent;")
-                print(f"✅ SVG icon yüklendi: {icon_path}")
                 return svg_widget
-            else:
-                print(f"❌ SVG icon bulunamadı: {icon_path}")
-                return None
-        except Exception as e:
-            print(f"❌ SVG yükleme hatası: {e}")
+            return None
+        except:
             return None
 
     def create_fallback_icon(self, emoji, color="#ffffff", size=20):
@@ -291,22 +451,19 @@ class ModernCorporateEczaneApp(QMainWindow):
         return label
 
     def setup_ui(self):
-        # Ana widget stack
         self.stacked_widget = QStackedWidget()
         self.setCentralWidget(self.stacked_widget)
         
-        # Eczane modu sayfası
         self.pharmacy_widget = QWidget()
         self.setup_pharmacy_ui()
         self.stacked_widget.addWidget(self.pharmacy_widget)
         
-        # Video modu sayfası
         self.video_widget = QWidget()
         self.setup_video_ui()
         self.stacked_widget.addWidget(self.video_widget)
 
     def setup_pharmacy_ui(self):
-        """🏢 HTTP SERVER + LOTTIE DESIGN"""
+        """🏢 PHARMACY UI"""
         widget = self.pharmacy_widget
         
         widget.setStyleSheet(f"""
@@ -322,23 +479,16 @@ class ModernCorporateEczaneApp(QMainWindow):
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setStyleSheet(f"""
-            QScrollArea {{
-                border: none;
-                background: transparent;
-            }}
+            QScrollArea {{ border: none; background: transparent; }}
             QScrollBar:vertical {{
                 background: {self.colors['bg_card']};
                 width: 8px;
                 border-radius: 4px;
-                margin: 0px;
             }}
             QScrollBar::handle:vertical {{
                 background: {self.colors['accent_blue']};
                 border-radius: 4px;
                 min-height: 30px;
-            }}
-            QScrollBar::handle:vertical:hover {{
-                background: #0056CC;
             }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
                 background: transparent;
@@ -352,7 +502,6 @@ class ModernCorporateEczaneApp(QMainWindow):
         layout.setSpacing(24)
         layout.setContentsMargins(40, 32, 40, 32)
         
-        # Sistemleri kur
         self.setup_lottie_weather()
         self.setup_animations()
         self.create_red_header_with_lottie(layout)
@@ -372,14 +521,13 @@ class ModernCorporateEczaneApp(QMainWindow):
         main_widget_layout.addWidget(scroll_area)
 
     def create_red_header_with_lottie(self, layout):
-        """🔴 HTTP SERVER + LOTTIE HEADER"""
+        """🔴 HEADER"""
         header = QWidget()
         header.setFixedHeight(140)
         header.setStyleSheet(f"""
             QWidget {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #DC143C, stop:0.5 #B22222, stop:1 #8B0000);
-                border: none;
                 border-radius: 16px;
             }}
         """)
@@ -413,31 +561,25 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         main_title = QLabel("KARŞIYAKA 4")
         main_title.setFont(QFont('Segoe UI', 26, QFont.Bold))
-        main_title.setStyleSheet("""
-            color: white;
-            background: transparent;
-        """)
+        main_title.setStyleSheet("color: white; background: transparent;")
         title_layout.addWidget(main_title)
         
         sub_title = QLabel("Nöbetçi Eczane Sistemi")
         sub_title.setFont(QFont('Segoe UI', 13, QFont.Medium))
-        sub_title.setStyleSheet("""
-            color: rgba(255, 255, 255, 0.9);
-            background: transparent;
-        """)
+        sub_title.setStyleSheet("color: rgba(255, 255, 255, 0.9); background: transparent;")
         title_layout.addWidget(sub_title)
         
         left_layout.addWidget(title_widget)
         header_layout.addWidget(left_widget, 2)
         
-        # SAĞ: Saat/Tarih + HTTP Lottie Weather
+        # SAĞ: Saat/Tarih + Weather
         right_widget = QWidget()
         right_widget.setStyleSheet("background: transparent;")
         right_layout = QVBoxLayout(right_widget)
         right_layout.setSpacing(8)
         right_layout.setContentsMargins(0, 8, 0, 8)
         
-        # SAAT/TARİH ROW
+        # Saat/Tarih satırı
         datetime_row = QWidget()
         datetime_row.setStyleSheet("background: transparent;")
         datetime_row_layout = QHBoxLayout(datetime_row)
@@ -448,28 +590,21 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.time_display = QLabel()
         self.time_display.setFont(QFont('Segoe UI', 18, QFont.Bold))
         self.time_display.setStyleSheet("color: white; background: transparent;")
-        self.time_display.setAlignment(Qt.AlignRight)
         datetime_row_layout.addWidget(self.time_display)
         
         bullet = QLabel("•")
         bullet.setFont(QFont('Segoe UI', 18, QFont.Bold))
-        bullet.setStyleSheet("""
-        color: rgba(255, 255, 255, 0.8); 
-        background: transparent;
-        padding-bottom: 15px;
-        """)
-        bullet.setAlignment(Qt.AlignCenter | Qt.AlignVCenter)
+        bullet.setStyleSheet("color: rgba(255, 255, 255, 0.8); background: transparent; padding-bottom: 15px;")
         datetime_row_layout.addWidget(bullet)
         
         self.date_display = QLabel()
         self.date_display.setFont(QFont('Segoe UI', 18, QFont.Medium))
         self.date_display.setStyleSheet("color: rgba(255, 255, 255, 0.9); background: transparent;")
-        self.date_display.setAlignment(Qt.AlignLeft)
         datetime_row_layout.addWidget(self.date_display)
         
         right_layout.addWidget(datetime_row)
         
-        # HTTP LOTTIE WEATHER ROW
+        # Weather satırı
         weather_row = QWidget()
         weather_row.setFixedHeight(30)
         weather_row.setStyleSheet("background: transparent;")
@@ -478,7 +613,6 @@ class ModernCorporateEczaneApp(QMainWindow):
         weather_row_layout.setContentsMargins(0, 0, 0, 0)
         weather_row_layout.addStretch()
         
-        # HTTP LOTTIE WIDGET
         weather_row_layout.addWidget(self.lottie_widget)
         
         self.weather_temp = QLabel("--°C")
@@ -486,12 +620,10 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.weather_temp.setStyleSheet("color: white; background: transparent;")
         weather_row_layout.addWidget(self.weather_temp)
         
-        # Fallback emoji (HTTP Lottie yoksa)
         self.weather_icon = QLabel("☀")
         self.weather_icon.setFont(QFont('Segoe UI', 16))
         self.weather_icon.setStyleSheet("color: white; background: transparent;")
-        self.weather_icon.setAlignment(Qt.AlignCenter)
-        self.weather_icon.hide()  # Başlangıçta gizli
+        self.weather_icon.hide()
         weather_row_layout.addWidget(self.weather_icon)
         
         right_layout.addWidget(weather_row)
@@ -504,18 +636,18 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.update_time()
 
     def create_svg_info_section(self, layout):
-        """📋 SVG İKONLU INFO SECTION"""
+        """📋 INFO SECTION"""
         info_container = QWidget()
         info_container.setFixedHeight(400)
         info_container.setStyleSheet(f"""
             background-color: {self.colors['bg_card']};
-            border: none;
             border-radius: 16px;
         """)
         
         info_layout = QVBoxLayout(info_container)
         info_layout.setContentsMargins(32, 24, 32, 24)
         info_layout.setSpacing(20)
+        
         title = QLabel("NÖBETÇİ ECZANE BİLGİLERİ")
         title.setFont(QFont('Segoe UI', 20, QFont.Bold))
         title.setStyleSheet(f"""
@@ -523,7 +655,6 @@ class ModernCorporateEczaneApp(QMainWindow):
             background-color: {self.colors['bg_accent']};
             padding: 16px 24px;
             border-radius: 12px;
-            border: none;
         """)
         title.setAlignment(Qt.AlignCenter)
         info_layout.addWidget(title)
@@ -533,11 +664,10 @@ class ModernCorporateEczaneApp(QMainWindow):
         content_row_layout = QHBoxLayout(content_row)
         content_row_layout.setSpacing(24)
         
-        # SOL: SVG İKONLU ECZANE BİLGİLERİ
+        # SOL: Eczane bilgileri
         self.info_widget = QWidget()
         self.info_widget.setStyleSheet(f"""
             background-color: {self.colors['bg_secondary']};
-            border: none;
             border-radius: 12px;
             padding: 24px;
         """)
@@ -545,8 +675,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.info_widget_layout = QVBoxLayout(self.info_widget)
         self.info_widget_layout.setSpacing(16)
         
-        # Başlangıç loading mesajı
-        loading_label = QLabel("HTTP Server üzerinden yükleniyor...")
+        loading_label = QLabel("⏳ Yükleniyor...")
         loading_label.setFont(QFont('Segoe UI', 16))
         loading_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
         loading_label.setAlignment(Qt.AlignCenter)
@@ -554,7 +683,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         content_row_layout.addWidget(self.info_widget, 2)
         
-        # SAĞ: QR KOD
+        # SAĞ: QR Kod
         qr_widget = QWidget()
         qr_widget.setStyleSheet("background: transparent;")
         qr_widget_layout = QVBoxLayout(qr_widget)
@@ -564,11 +693,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         qr_title = QLabel("YOL TARİFİ İÇİN\nQR OKUTUNUZ")
         qr_title.setFont(QFont('Segoe UI', 12, QFont.Bold))
         qr_title.setAlignment(Qt.AlignCenter)
-        qr_title.setStyleSheet(f"""
-            color: {self.colors['text_secondary']};
-            background: transparent;
-            padding: 8px;
-        """)
+        qr_title.setStyleSheet(f"color: {self.colors['text_secondary']}; background: transparent; padding: 8px;")
         qr_widget_layout.addWidget(qr_title)
         
         qr_container = QWidget()
@@ -582,7 +707,6 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.qr_label.setFixedSize(160, 160)
         self.qr_label.setStyleSheet(f"""
             background-color: {self.colors['text_primary']};
-            border: none;
             border-radius: 12px;
             color: {self.colors['bg_primary']};
             font-size: 16px;
@@ -599,10 +723,15 @@ class ModernCorporateEczaneApp(QMainWindow):
         layout.addWidget(info_container)
 
     def create_svg_info_display(self, name, phone, address, distance, duration):
-        """📱 SVG İKONLU BİLGİ DİSPLAY"""
+        """📱 BİLGİ DISPLAY"""
         # Mevcut widget'ları temizle
         for i in reversed(range(self.info_widget_layout.count())): 
-            self.info_widget_layout.itemAt(i).widget().setParent(None)
+            widget = self.info_widget_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+        
+        # Telefon formatla
+        phone = self.format_phone_number(phone)
         
         # ECZANE ADI
         name_label = QLabel(name)
@@ -611,97 +740,56 @@ class ModernCorporateEczaneApp(QMainWindow):
         name_label.setWordWrap(True)
         self.info_widget_layout.addWidget(name_label)
         
-        # TELEFON - SVG İKONLU
-        phone_row = QWidget()
-        phone_row.setStyleSheet("background: transparent;")
-        phone_row_layout = QHBoxLayout(phone_row)
-        phone_row_layout.setSpacing(12)
-        phone_row_layout.setContentsMargins(0, 4, 0, 4)
-        
-        phone_icon = self.load_svg_icon("icons/phone.svg", size=18)
-        if phone_icon:
-            phone_row_layout.addWidget(phone_icon)
-        else:
-            phone_fallback = self.create_fallback_icon("📞", self.colors['accent_blue'], 18)
-            phone_row_layout.addWidget(phone_fallback)
-        
-        phone_label = QLabel(phone)
-        phone_label.setFont(QFont('Segoe UI', 14))
-        phone_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
-        phone_row_layout.addWidget(phone_label)
-        phone_row_layout.addStretch()
+        # TELEFON
+        phone_row = self.create_info_row("icons/phone.svg", "📞", phone, self.colors['accent_blue'])
         self.info_widget_layout.addWidget(phone_row)
         
-        # ADRES - SVG İKONLU
-        address_row = QWidget()
-        address_row.setStyleSheet("background: transparent;")
-        address_row_layout = QHBoxLayout(address_row)
-        address_row_layout.setSpacing(12)
-        address_row_layout.setContentsMargins(0, 4, 0, 4)
-        address_row_layout.setAlignment(Qt.AlignTop)
-        
-        location_icon = self.load_svg_icon("icons/location.svg", size=18)
-        if location_icon:
-            address_row_layout.addWidget(location_icon)
-        else:
-            location_fallback = self.create_fallback_icon("📍", self.colors['accent_red'], 18)
-            address_row_layout.addWidget(location_fallback)
-        
-        address_label = QLabel(address)
-        address_label.setFont(QFont('Segoe UI', 14))
-        address_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
-        address_label.setWordWrap(True)
-        address_row_layout.addWidget(address_label)
+        # ADRES
+        address_row = self.create_info_row("icons/location.svg", "📍", address, self.colors['accent_red'], wrap=True)
         self.info_widget_layout.addWidget(address_row)
         
-        # MESAFE - SVG İKONLU
-        distance_row = QWidget()
-        distance_row.setStyleSheet("background: transparent;")
-        distance_row_layout = QHBoxLayout(distance_row)
-        distance_row_layout.setSpacing(12)
-        distance_row_layout.setContentsMargins(0, 4, 0, 4)
-        
-        distance_icon = self.load_svg_icon("icons/distance.svg", size=18)
-        if distance_icon:
-            distance_row_layout.addWidget(distance_icon)
-        else:
-            distance_fallback = self.create_fallback_icon("🚗", self.colors['accent_green'], 18)
-            distance_row_layout.addWidget(distance_fallback)
-        
-        distance_label = QLabel(f"Mesafe: {distance}")
-        distance_label.setFont(QFont('Segoe UI', 14))
-        distance_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
-        distance_row_layout.addWidget(distance_label)
-        distance_row_layout.addStretch()
+        # MESAFE
+        distance_row = self.create_info_row("icons/distance.svg", "🚗", f"Mesafe: {distance}", self.colors['accent_green'])
         self.info_widget_layout.addWidget(distance_row)
         
-        # SÜRE - SVG İKONLU
-        time_row = QWidget()
-        time_row.setStyleSheet("background: transparent;")
-        time_row_layout = QHBoxLayout(time_row)
-        time_row_layout.setSpacing(12)
-        time_row_layout.setContentsMargins(0, 4, 0, 4)
-        
-        time_icon = self.load_svg_icon("icons/time.svg", size=18)
-        if time_icon:
-            time_row_layout.addWidget(time_icon)
-        else:
-            time_fallback = self.create_fallback_icon("⏱️", self.colors['accent_purple'], 18)
-            time_row_layout.addWidget(time_fallback)
-        
-        time_label = QLabel(f"Süre: {duration}")
-        time_label.setFont(QFont('Segoe UI', 14))
-        time_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
-        time_row_layout.addWidget(time_label)
-        time_row_layout.addStretch()
+        # SÜRE
+        time_row = self.create_info_row("icons/time.svg", "⏱️", f"Süre: {duration}", self.colors['accent_purple'])
         self.info_widget_layout.addWidget(time_row)
 
+    def create_info_row(self, svg_path, fallback_emoji, text, color, wrap=False):
+        """Bilgi satırı oluştur"""
+        row = QWidget()
+        row.setStyleSheet("background: transparent;")
+        row_layout = QHBoxLayout(row)
+        row_layout.setSpacing(12)
+        row_layout.setContentsMargins(0, 4, 0, 4)
+        if wrap:
+            row_layout.setAlignment(Qt.AlignTop)
+        
+        icon = self.load_svg_icon(svg_path, size=18)
+        if icon:
+            row_layout.addWidget(icon)
+        else:
+            fallback = self.create_fallback_icon(fallback_emoji, color, 18)
+            row_layout.addWidget(fallback)
+        
+        label = QLabel(text)
+        label.setFont(QFont('Segoe UI', 14))
+        label.setStyleSheet(f"color: {self.colors['text_secondary']};")
+        if wrap:
+            label.setWordWrap(True)
+        row_layout.addWidget(label)
+        
+        if not wrap:
+            row_layout.addStretch()
+        
+        return row
+
     def create_corporate_qr_map_section(self, layout):
-        """🗺️ BÜYÜK HARİTA + LEJANT"""
+        """🗺️ HARİTA SECTION"""
         map_container = QWidget()
         map_container.setStyleSheet(f"""
             background-color: {self.colors['bg_card']};
-            border: none;
             border-radius: 16px;
         """)
         
@@ -717,11 +805,10 @@ class ModernCorporateEczaneApp(QMainWindow):
             background-color: {self.colors['bg_accent']};
             padding: 12px 20px;
             border-radius: 12px;
-            border: none;
         """)
         map_layout.addWidget(map_title)
         
-        # LEJANT EKLE
+        # LEJANT
         legend_widget = QWidget()
         legend_widget.setStyleSheet("background: transparent;")
         legend_layout = QHBoxLayout(legend_widget)
@@ -729,8 +816,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         legend_layout.setSpacing(40)
         
         legend_layout.addStretch()
-
-        # B: BAŞLANGIÇ
+        
         start_legend = QLabel("🔵 B: Buradasınız")
         start_legend.setFont(QFont('Segoe UI', 12, QFont.Medium))
         start_legend.setStyleSheet(f"color: {self.colors['text_secondary']};")
@@ -738,33 +824,36 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         legend_layout.addStretch()
         
-        # E: ECZANE
         end_legend = QLabel("🔴 E: Nöbetçi Eczane")
         end_legend.setFont(QFont('Segoe UI', 12, QFont.Medium))
         end_legend.setStyleSheet(f"color: {self.colors['text_secondary']};")
         legend_layout.addWidget(end_legend)
         
-        map_layout.addWidget(legend_widget)
-
         legend_layout.addStretch()
         
-        # HARİTA
-        self.map_label = QLabel()
+        map_layout.addWidget(legend_widget)
+        
+        # HARİTA LABEL
+        self.map_label = QLabel("⏳ Harita yükleniyor...")
         self.map_label.setAlignment(Qt.AlignCenter)
         self.map_label.setMinimumHeight(570)
         self.map_label.setMaximumHeight(570)
-        # ... geri kalan map_label kodu aynı ...
-    
+        self.map_label.setStyleSheet(f"""
+            background-color: {self.colors['bg_secondary']};
+            border-radius: 12px;
+            color: {self.colors['text_muted']};
+            font-size: 16px;
+        """)
         map_layout.addWidget(self.map_label)
+        
         layout.addWidget(map_container)
 
     def create_corporate_footer(self, layout):
-        """🏢 HTTP SERVER FOOTER"""
+        """🏢 FOOTER"""
         footer = QWidget()
         footer.setFixedHeight(60)
         footer.setStyleSheet(f"""
             background-color: {self.colors['bg_card']};
-            border: none;
             border-radius: 16px;
         """)
         
@@ -773,20 +862,14 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         self.last_update_label = QLabel("Son güncelleme: --:--")
         self.last_update_label.setFont(QFont('Segoe UI', 14, QFont.Medium))
-        self.last_update_label.setStyleSheet(f"""
-            color: {self.colors['text_secondary']};
-            background: transparent;
-        """)
+        self.last_update_label.setStyleSheet(f"color: {self.colors['text_secondary']}; background: transparent;")
         footer_layout.addWidget(self.last_update_label)
         
         footer_layout.addStretch()
         
-        self.status_label = QLabel("● Powered by AI")
+        self.status_label = QLabel("● Sistem Aktif")
         self.status_label.setFont(QFont('Segoe UI', 14, QFont.Bold))
-        self.status_label.setStyleSheet(f"""
-            color: {self.colors['accent_green']};
-            background: transparent;
-        """)
+        self.status_label.setStyleSheet(f"color: {self.colors['accent_green']}; background: transparent;")
         footer_layout.addWidget(self.status_label)
         
         layout.addWidget(footer)
@@ -795,41 +878,25 @@ class ModernCorporateEczaneApp(QMainWindow):
         """Logo yükle"""
         try:
             logo_paths = ["logo/LOGO.png", "logo/logo.png", "logo/Logo.png"]
-            logo_loaded = False
             for path in logo_paths:
                 if os.path.exists(path):
                     pixmap = QPixmap(path)
                     if not pixmap.isNull():
                         scaled_logo = pixmap.scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                         self.logo_label.setPixmap(scaled_logo)
-                        logo_loaded = True
-                        print(f"✅ Logo yüklendi: {path}")
-                        break
-            if not logo_loaded:
-                self.logo_label.setText("🏥")
-                self.logo_label.setFont(QFont('Segoe UI', 24))
-                self.logo_label.setStyleSheet("""
-                    background: transparent;
-                    color: white;
-                    border-radius: 35px;
-                    border: 2px solid rgba(255, 255, 255, 0.3);
-                """)
-                print("📋 Logo bulunamadı, emoji kullanıldı")
-        except Exception as e:
+                        return
+            
             self.logo_label.setText("🏥")
-            self.logo_label.setFont(QFont('Segoe UI', 28))
-            print(f"⚠️ Logo hatası: {e}")
+            self.logo_label.setFont(QFont('Segoe UI', 24))
+        except:
+            self.logo_label.setText("🏥")
+            self.logo_label.setFont(QFont('Segoe UI', 24))
 
     def update_time(self):
         """Saat ve tarih güncelle"""
         now = datetime.now()
-        time_str = now.strftime("%H:%M:%S")
-        date_str = now.strftime("%d.%m.%Y")
-        
-        if hasattr(self, 'time_display'):
-            self.time_display.setText(time_str)
-        if hasattr(self, 'date_display'):
-            self.date_display.setText(date_str)
+        self.time_display.setText(now.strftime("%H:%M:%S"))
+        self.date_display.setText(now.strftime("%d.%m.%Y"))
 
     def setup_video_ui(self):
         """Video UI"""
@@ -863,10 +930,7 @@ ads/ klasöründe video dosyası bulunamadı.
 Desteklenen formatlar:
 • MP4 (.mp4)
 • MOV (.mov) 
-• AVI (.avi)
-
-Video eklemek için ads/ klasörüne
-video dosyası koyun."""
+• AVI (.avi)"""
         else:
             message = "🎬 Video yükleniyor..."
             
@@ -902,32 +966,27 @@ video dosyası koyun."""
 
     def setup_timers(self):
         """Timer kurulum"""
+        # Veri güncelleme - 30 dakikada bir
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.fetch_data)
-        self.update_timer.start(1800000)
+        self.update_timer.start(1800000)  # 30 dakika
 
+        # Mod kontrolü - dakikada bir
         self.schedule_timer = QTimer()
         self.schedule_timer.timeout.connect(self.check_schedule_and_switch)
-        self.schedule_timer.start(60000)
+        self.schedule_timer.start(60000)  # 1 dakika
         
-        print("⏰ Nöbet saatleri kontrolü aktif: 18:45-08:45")
+        print("⏰ Nöbet saatleri: Hafta içi 18:45-08:45, Cumartesi 16:00-08:45, Pazar tüm gün")
 
     def setup_animations(self):
-        """🎬 ANİMASYON SİSTEMLERİ KURULUM"""
+        """Animasyon kurulum"""
         self.pulse_timer = QTimer()
         self.pulse_timer.timeout.connect(self.pulse_animation)
         self.pulse_timer.start(1000)
         self.pulse_state = True
-        
-        self.spinner_timer = QTimer()
-        self.spinner_timer.timeout.connect(self.spinner_animation)
-        self.spinner_angle = 0
-        self.is_loading = False
-        
-        print("🎬 Animasyon sistemleri başlatıldı!")
 
     def pulse_animation(self):
-        """💓 PULSE EFEKT"""
+        """Pulse efekt"""
         if hasattr(self, 'status_label'):
             if self.pulse_state:
                 self.status_label.setStyleSheet(f"""
@@ -935,61 +994,53 @@ video dosyası koyun."""
                     background: rgba(48, 209, 88, 0.2);
                     border-radius: 8px;
                     padding: 4px 8px;
-                    font-weight: bold;
                 """)
             else:
                 self.status_label.setStyleSheet(f"""
                     color: {self.colors['accent_green']};
                     background: transparent;
-                    font-weight: bold;
                 """)
-            
             self.pulse_state = not self.pulse_state
 
-    def show_loading_spinner(self):
-        """🔄 LOADING SPINNER GÖSTER"""
-        self.is_loading = True
-        self.map_label.setText("🔄 Harita yükleniyor...")
-        self.spinner_timer.start(100)
-
-    def hide_loading_spinner(self):
-        """🔄 LOADING SPINNER GİZLE"""
-        self.is_loading = False
-        self.spinner_timer.stop()
-
-    def spinner_animation(self):
-        """🔄 DÖNEN CIRCLE ANİMASYON"""
-        if self.is_loading:
-            spinner_chars = ["◐", "◓", "◑", "◒"]
-            char_index = (self.spinner_angle // 2) % len(spinner_chars)
-            spinner_char = spinner_chars[char_index]
-            
-            self.map_label.setText(f"{spinner_char} Harita yükleniyor...")
-            self.spinner_angle += 1
-            
-            if self.spinner_angle > 100:
-                self.spinner_angle = 0
-
     def check_schedule_and_switch(self):
-        """Nöbet saatleri kontrolü ve mod değişimi"""
+        """
+        🕐 NÖBET SAATLERİ KONTROLÜ
+        
+        Hafta içi (Pazartesi-Cuma): 18:45 - 08:45
+        Cumartesi: 16:00 - 08:45 (ertesi gün)
+        Pazar: TÜM GÜN
+        """
         now = datetime.now()
         current_time = now.time()
-        current_day = now.weekday()
+        current_day = now.weekday()  # 0=Pazartesi, 5=Cumartesi, 6=Pazar
         
-        is_night_shift = (
-            current_time >= datetime.strptime("18:45", "%H:%M").time() or
-            current_time <= datetime.strptime("08:45", "%H:%M").time()
-        )
+        # Saatleri tanımla
+        time_0845 = datetime.strptime("08:45", "%H:%M").time()
+        time_1600 = datetime.strptime("16:00", "%H:%M").time()
+        time_1845 = datetime.strptime("18:45", "%H:%M").time()
         
-        is_sunday = (current_day == 6)
-        should_show_pharmacy = is_night_shift or is_sunday
+        should_show_pharmacy = False
         
+        if current_day == 6:  # PAZAR - TÜM GÜN
+            should_show_pharmacy = True
+            
+        elif current_day == 5:  # CUMARTESİ - 16:00'dan itibaren
+            if current_time >= time_1600 or current_time <= time_0845:
+                should_show_pharmacy = True
+                
+        else:  # HAFTA İÇİ (Pazartesi-Cuma) - 18:45'ten itibaren
+            if current_time >= time_1845 or current_time <= time_0845:
+                should_show_pharmacy = True
+        
+        # Mod değişimi
         if should_show_pharmacy and self.current_mode != "pharmacy":
-            print(f"🏥 NÖBET MODUNA GEÇİYOR - Saat: {now.strftime('%H:%M')}")
+            day_names = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+            print(f"🏥 NÖBET MODUNA GEÇİYOR - {day_names[current_day]} {now.strftime('%H:%M')}")
             self.switch_to_pharmacy_mode()
             
         elif not should_show_pharmacy and self.current_mode != "video":
-            print(f"🎬 REKLAM MODUNA GEÇİYOR - Saat: {now.strftime('%H:%M')}")
+            day_names = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+            print(f"🎬 REKLAM MODUNA GEÇİYOR - {day_names[current_day]} {now.strftime('%H:%M')}")
             self.switch_to_video_mode()
 
     def switch_to_video_mode(self):
@@ -998,6 +1049,7 @@ video dosyası koyun."""
         self.stacked_widget.setCurrentWidget(self.video_widget)
         
         if self.video_path and os.path.exists(self.video_path):
+            self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(os.path.abspath(self.video_path))))
             self.media_player.play()
             self.no_video_label.hide()
             self.video_widget_display.show()
@@ -1016,296 +1068,235 @@ video dosyası koyun."""
         self.fetch_data()
         self.fetch_weather_data()
 
+    # ========================================================================
+    # 🔄 WORKER THREAD İLE VERİ ÇEKME - DONMA YOK!
+    # ========================================================================
+    
     def fetch_data(self):
-        """📡 HTTP SERVER İLE ECZANE VERİSİ ÇEK"""
-        try:
-            print("📡 HTTP Server üzerinden eczane bilgileri güncelleniyor...")
-            url = "https://www.izmireczaciodasi.org.tr/nobetci-eczaneler"
-            r = requests.get(url, timeout=10)
-            soup = BeautifulSoup(r.text, 'html.parser')
-            
-            h4_elements = soup.find_all('h4', class_='red')
-            
-            for h4 in h4_elements:
-                strong = h4.find('strong')
-                if strong and 'KARŞIYAKA 4' in strong.text.upper():
-                    name = strong.text.strip()
-                    parent_div = h4.parent
-                    
-                    # Telefon
-                    phone = "Bulunamadı"
-                    phone_link = parent_div.find('a', href=lambda x: x and 'tel:' in x)
-                    if phone_link:
-                        phone = phone_link.get('href').replace('tel:', '')
-                        if len(phone) == 10:
-                            phone = '0' + phone
-                        
-                        # TELEFON FORMATLA
-                        phone = self.format_phone_number(phone)
-                    
-                    # Adres
-                    address = "Adres bulunamadı"
-                    address_icon = parent_div.find('i', class_='fa fa-home main-color')
-                    if address_icon and address_icon.next_sibling:
-                        address = address_icon.next_sibling.strip()
-                    
-                    # Google Maps
-                    maps_link = parent_div.find('a', href=lambda x: x and 'google.com/maps' in x)
-                    maps_url = maps_link.get('href') if maps_link else None
-                    
-                    # Koordinatlar
-                    end_lat, end_lon = 38.473137, 27.113438
-                    if maps_url and 'q=' in maps_url:
-                        try:
-                            coords = maps_url.split('q=')[1].split('&')[0]
-                            end_lat, end_lon = map(float, coords.split(','))
-                        except:
-                            pass
-                    
-                    # Mesafe ve süre
-                    distance, duration = self.get_route_info(end_lat, end_lon)
-                    
-                    # SVG İKONLU BİLGİ GÜNCELLEMESİ
-                    self.create_svg_info_display(name, phone, address, distance, duration)
-                    
-                    # QR kod oluştur
-                    if maps_url:
-                        self.create_qr_code(maps_url)
-                    
-                    # Harita oluştur
-                    self.create_route_map(end_lat, end_lon)
-                    
-                    # Son güncelleme
-                    now = datetime.now()
-                    self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')}")
-                    
-                    print("✅ HTTP Server eczane bilgileri güncellendi")
-                    return
-            
-            # Bulunamadı durumu
-            error_label = QLabel("KARŞIYAKA 4'te nöbetçi eczane bulunamadı")
-            error_label.setFont(QFont('Segoe UI', 16))
-            error_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
-            error_label.setAlignment(Qt.AlignCenter)
-            
-            # Mevcut widget'ları temizle
-            for i in reversed(range(self.info_widget_layout.count())): 
-                self.info_widget_layout.itemAt(i).widget().setParent(None)
-            self.info_widget_layout.addWidget(error_label)
-            
-            now = datetime.now()
-            self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')} (Bulunamadı)")
-            
-        except Exception as e:
-            error_label = QLabel(f"Bağlantı hatası: {str(e)}")
-            error_label.setFont(QFont('Segoe UI', 16))
-            error_label.setStyleSheet(f"color: {self.colors['accent_red']};")
-            error_label.setAlignment(Qt.AlignCenter)
-            error_label.setWordWrap(True)
-            
-            # Mevcut widget'ları temizle
-            for i in reversed(range(self.info_widget_layout.count())): 
-                self.info_widget_layout.itemAt(i).widget().setParent(None)
-            self.info_widget_layout.addWidget(error_label)
-            
-            now = datetime.now()
-            self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')} (Hata)")
-            print(f"❌ HTTP Server güncelleme hatası: {e}")
-    def format_phone_number(self, phone):
-        """📞 Telefon numarasını formatla: 0232 999 99 99"""
-        try:
-            # Sadece rakamları al
-            digits = ''.join(filter(str.isdigit, phone))
-            
-            if len(digits) == 11 and digits.startswith('0'):
-                # 0232 999 99 99 formatı
-                return f"{digits[:4]} {digits[4:7]} {digits[7:9]} {digits[9:11]}"
-            elif len(digits) == 10:
-                # Başında 0 yoksa ekle
-                digits = '0' + digits
-                return f"{digits[:4]} {digits[4:7]} {digits[7:9]} {digits[9:11]}"
-            else:
-                # Format uymazsa olduğu gibi döndür
-                return phone
-                
-        except:
-            return phone
+        """📡 ECZANE VERİSİ ÇEK - WORKER THREAD"""
+        print("📡 Eczane bilgileri güncelleniyor (background)...")
+        
+        # Loading göster
+        self.show_loading_state()
+        
+        # Worker thread başlat
+        self.pharmacy_worker = DataFetchWorker("pharmacy")
+        self.pharmacy_worker.pharmacy_data_ready.connect(self.on_pharmacy_data_ready)
+        self.pharmacy_worker.error_occurred.connect(self.on_fetch_error)
+        self.pharmacy_worker.start()
 
-    def get_route_info(self, end_lat, end_lon):
-        """Mesafe ve süre bilgisi al"""
-        try:
-            directions_url = (
-                f"https://maps.googleapis.com/maps/api/directions/json?"
-                f"origin={self.start_lat},{self.start_lon}&"
-                f"destination={end_lat},{end_lon}&"
-                f"mode=driving&"
-                f"key={self.api_key}"
-            )
+    def on_pharmacy_data_ready(self, data):
+        """✅ Eczane verisi geldi - UI güncelle"""
+        if data.get('found'):
+            name = data['name']
+            phone = data['phone']
+            address = data['address']
+            maps_url = data['maps_url']
+            self.end_lat = data['end_lat']
+            self.end_lon = data['end_lon']
             
-            response = requests.get(directions_url, timeout=10)
+            # Önce mesafe/süre olmadan göster
+            self.create_svg_info_display(name, phone, address, "Hesaplanıyor...", "Hesaplanıyor...")
             
-            if response.status_code == 200:
-                data = response.json()
-                if data['status'] == 'OK':
-                    leg = data['routes'][0]['legs'][0]
-                    distance = leg['distance']['text']
-                    duration = leg['duration']['text']
-                    
-                    # TÜRKÇELEŞTİR
-                    duration = duration.replace('mins', 'dakika')
-                    duration = duration.replace('min', 'dakika') 
-                    duration = duration.replace('hours', 'saat')
-                    duration = duration.replace('hour', 'saat')
-                    
-                    return distance, duration
-                    
-        except Exception as e:
-            print(f"Rota bilgisi hatası: {e}")
+            # QR kod oluştur
+            if maps_url:
+                self.create_qr_code(maps_url)
             
-        return "~2 km", "~5 dakika"  # Fallback da Türkçe
+            # Harita için worker başlat
+            self.fetch_map_data()
+            
+            # Son güncelleme
+            now = datetime.now()
+            self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')}")
+            
+            print(f"✅ Eczane bulundu: {name}")
+        else:
+            self.show_not_found_state()
 
-    def create_route_map(self, end_lat, end_lon):
-        """Harita oluştur"""
+    def fetch_map_data(self):
+        """🗺️ HARİTA VERİSİ ÇEK - WORKER THREAD"""
+        if not self.end_lat or not self.end_lon:
+            return
+        
+        self.map_label.setText("⏳ Harita yükleniyor...")
+        
+        self.map_worker = DataFetchWorker(
+            "map",
+            api_key=self.api_key,
+            start_lat=self.start_lat,
+            start_lon=self.start_lon,
+            end_lat=self.end_lat,
+            end_lon=self.end_lon
+        )
+        self.map_worker.map_data_ready.connect(self.on_map_data_ready)
+        self.map_worker.error_occurred.connect(self.on_map_error)
+        self.map_worker.start()
+
+    def on_map_data_ready(self, data):
+        """✅ Harita verisi geldi"""
         try:
-            directions_url = (
-                f"https://maps.googleapis.com/maps/api/directions/json?"
-                f"origin={self.start_lat},{self.start_lon}&"
-                f"destination={end_lat},{end_lon}&"
-                f"mode=driving&"
-                f"key={self.api_key}"
-            )
+            # Harita göster
+            map_bytes = data.get('map_data')
+            if map_bytes:
+                pixmap = QPixmap()
+                pixmap.loadFromData(map_bytes)
+                scaled_pixmap = pixmap.scaled(820, 550, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.map_label.setPixmap(scaled_pixmap)
             
-            directions_response = requests.get(directions_url, timeout=10)
+            # Mesafe/süre güncelle (info widget'ta)
+            distance = data.get('distance', '~2 km')
+            duration = data.get('duration', '~5 dakika')
             
-            if directions_response.status_code == 200:
-                directions_data = directions_response.json()
-                
-                if directions_data['status'] == 'OK':
-                    route = directions_data['routes'][0]
-                    polyline = route['overview_polyline']['points']
-                    
-                    distance_value = route['legs'][0]['distance']['value']
-                    
-                    if distance_value < 500:
-                        zoom_level = 17
-                    elif distance_value < 800:
-                        zoom_level = 17
-                    elif distance_value < 1200:
-                        zoom_level = 17
-                    elif distance_value < 2000:
-                        zoom_level = 16
-                    elif distance_value < 3000:
-                        zoom_level = 15
-                    else:
-                        zoom_level = 14
-                    
-                    map_width = 820
-                    map_height = 550
-                    
-                    static_map_url = (
-                        f"https://maps.googleapis.com/maps/api/staticmap?"
-                        f"size={map_width}x{map_height}&"
-                        f"maptype=roadmap&"
-                        f"style=feature:all|element:geometry|color:0x1a1a1a&"
-                        f"style=feature:all|element:labels.icon|visibility:off&"
-                        f"style=feature:all|element:labels.text.fill|color:0xcccccc&"
-                        f"style=feature:all|element:labels.text.stroke|color:0x000000&"
-                        f"style=feature:road|element:geometry|color:0x333333&"
-                        f"style=feature:road|element:geometry.stroke|color:0x222222&"
-                        f"style=feature:road|element:labels.text.fill|color:0xffffff&"
-                        f"style=feature:water|element:geometry|color:0x007AFF&"
-                        f"style=feature:landscape|element:geometry|color:0x111111&"
-                        f"markers=color:0x0066FF|size:large|label:B|{self.start_lat},{self.start_lon}&"  # Mavi büyük
-                        f"markers=color:0xFF0000|size:large|label:E|{end_lat},{end_lon}&"  # Kırmızı büyük
-                        f"path=color:0x007AFF|weight:4|enc:{polyline}&"
-                        f"zoom={zoom_level}&"
-                        f"key={self.api_key}"
-                    )
-                    
-                    map_response = requests.get(static_map_url, timeout=10)
-                    
-                    if map_response.status_code == 200:
-                        self.hide_loading_spinner()
-                        
-                        pixmap = QPixmap()
-                        pixmap.loadFromData(map_response.content)
-                        
-                        scaled_pixmap = pixmap.scaled(820, 550, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                        self.map_label.setPixmap(scaled_pixmap)
-                        
-                        print("✅ HTTP Server harita oluşturuldu")
-                        return
-                        
+            # Mevcut bilgileri al ve güncelle
+            self.update_distance_duration(distance, duration)
+            
+            print(f"✅ Harita yüklendi - {distance}, {duration}")
+            
         except Exception as e:
-            print(f"Harita hatası: {e}")
-            
-        self.hide_loading_spinner()
+            print(f"❌ Harita gösterme hatası: {e}")
+            self.map_label.setText("❌ Harita yüklenemedi")
+
+    def update_distance_duration(self, distance, duration):
+        """Mesafe ve süre bilgisini güncelle"""
+        # Info widget'taki label'ları bul ve güncelle
+        for i in range(self.info_widget_layout.count()):
+            widget = self.info_widget_layout.itemAt(i).widget()
+            if widget:
+                # QHBoxLayout içindeki QLabel'ları bul
+                layout = widget.layout()
+                if layout:
+                    for j in range(layout.count()):
+                        item = layout.itemAt(j)
+                        if item and item.widget():
+                            label = item.widget()
+                            if isinstance(label, QLabel):
+                                text = label.text()
+                                if "Mesafe:" in text:
+                                    label.setText(f"Mesafe: {distance}")
+                                elif "Süre:" in text:
+                                    label.setText(f"Süre: {duration}")
+
+    def on_map_error(self, error_msg):
+        """Harita hatası"""
+        print(f"❌ {error_msg}")
         self.map_label.setText("❌ Harita yüklenemedi")
         self.map_label.setStyleSheet(f"""
             background-color: {self.colors['bg_secondary']};
             color: {self.colors['text_secondary']};
             font-size: 16px;
-            border: none;
             border-radius: 12px;
         """)
 
     def fetch_weather_data(self):
-        """🌤️ HTTP SERVER İLE HAVA DURUMU ÇEK"""
-        try:
-            print("🌡️ HTTP Server üzerinden hava durumu alınıyor...")
-            url = f"http://api.openweathermap.org/data/2.5/weather"
-            params = {
-                'q': 'Izmir,TR',
-                'appid': self.weather_api_key,
-                'units': 'metric',
-                'lang': 'tr'
-            }
-            
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            
-            temp = round(data['main']['temp'])
-            desc = data['weather'][0]['description'].title()
-            weather_main = data['weather'][0]['main'].lower()
-            
-            # HTTP Lottie animasyonu yükle
-            lottie_loaded = self.load_lottie_animation(weather_main, temp)
-            
-            if lottie_loaded:
-                # HTTP Lottie yüklendi, emoji'yi gizle
-                self.weather_icon.hide()
-                self.lottie_widget.show()
-                print(f"🎬 HTTP Lottie animasyon: {weather_main}")
-            else:
-                # Fallback emoji kullan
-                self.lottie_widget.hide()
-                self.weather_icon.show()
-                weather_emoji = self.get_weather_emoji(weather_main, temp)
-                self.weather_icon.setText(weather_emoji)
-                print(f"😀 Fallback emoji: {weather_emoji}")
-            
-            self.weather_temp.setText(f"{temp}°C")
-            
-            print(f"✅ HTTP Server hava durumu: {temp}°C - {desc}")
-            
-        except Exception as e:
-            self.weather_temp.setText("--°C")
-            self.weather_icon.setText("❓")
-            self.weather_icon.show()
+        """🌤️ HAVA DURUMU ÇEK - WORKER THREAD"""
+        print("🌡️ Hava durumu alınıyor (background)...")
+        
+        self.weather_worker = DataFetchWorker(
+            "weather",
+            api_key=self.weather_api_key
+        )
+        self.weather_worker.weather_data_ready.connect(self.on_weather_data_ready)
+        self.weather_worker.error_occurred.connect(self.on_weather_error)
+        self.weather_worker.start()
+
+    def on_weather_data_ready(self, data):
+        """✅ Hava durumu geldi"""
+        temp = data['temp']
+        weather_main = data['weather_main']
+        
+        # Lottie animasyonu dene
+        lottie_loaded = self.load_lottie_animation(weather_main, temp)
+        
+        if lottie_loaded:
+            self.weather_icon.hide()
+            self.lottie_widget.show()
+        else:
             self.lottie_widget.hide()
-            print(f"Hava durumu hatası: {e}")
+            self.weather_icon.show()
+            self.weather_icon.setText(self.get_weather_emoji(weather_main, temp))
+        
+        self.weather_temp.setText(f"{temp}°C")
+        print(f"✅ Hava durumu: {temp}°C - {weather_main}")
+
+    def on_weather_error(self, error_msg):
+        """Hava durumu hatası"""
+        print(f"❌ {error_msg}")
+        self.weather_temp.setText("--°C")
+        self.weather_icon.setText("❓")
+        self.weather_icon.show()
+        self.lottie_widget.hide()
+
+    def on_fetch_error(self, error_msg):
+        """Genel fetch hatası"""
+        print(f"❌ {error_msg}")
+        self.show_error_state(error_msg)
+
+    def show_loading_state(self):
+        """Loading durumu göster"""
+        for i in reversed(range(self.info_widget_layout.count())): 
+            widget = self.info_widget_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+        
+        loading_label = QLabel("⏳ Nöbetçi eczane bilgileri yükleniyor...")
+        loading_label.setFont(QFont('Segoe UI', 16))
+        loading_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
+        loading_label.setAlignment(Qt.AlignCenter)
+        self.info_widget_layout.addWidget(loading_label)
+
+    def show_not_found_state(self):
+        """Bulunamadı durumu"""
+        for i in reversed(range(self.info_widget_layout.count())): 
+            widget = self.info_widget_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+        
+        error_label = QLabel("❌ KARŞIYAKA 4'te nöbetçi eczane bulunamadı")
+        error_label.setFont(QFont('Segoe UI', 16))
+        error_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
+        error_label.setAlignment(Qt.AlignCenter)
+        self.info_widget_layout.addWidget(error_label)
+        
+        now = datetime.now()
+        self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')} (Bulunamadı)")
+
+    def show_error_state(self, error_msg):
+        """Hata durumu"""
+        for i in reversed(range(self.info_widget_layout.count())): 
+            widget = self.info_widget_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+        
+        error_label = QLabel(f"❌ Bağlantı hatası:\n{error_msg}")
+        error_label.setFont(QFont('Segoe UI', 14))
+        error_label.setStyleSheet(f"color: {self.colors['accent_red']};")
+        error_label.setAlignment(Qt.AlignCenter)
+        error_label.setWordWrap(True)
+        self.info_widget_layout.addWidget(error_label)
+        
+        now = datetime.now()
+        self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')} (Hata)")
+
+    def format_phone_number(self, phone):
+        """📞 Telefon formatla: 0232 999 99 99"""
+        try:
+            digits = ''.join(filter(str.isdigit, phone))
+            
+            if len(digits) == 11 and digits.startswith('0'):
+                return f"{digits[:4]} {digits[4:7]} {digits[7:9]} {digits[9:11]}"
+            elif len(digits) == 10:
+                digits = '0' + digits
+                return f"{digits[:4]} {digits[4:7]} {digits[7:9]} {digits[9:11]}"
+            else:
+                return phone
+        except:
+            return phone
 
     def get_weather_emoji(self, weather_main, temp):
-        """🌟 WEATHER EMOJI"""
+        """Weather emoji"""
         if weather_main in ['clear', 'sunny']:
-            if temp >= 30:
-                return "🔥"
-            elif temp >= 25:
-                return "☀"
-            else:
-                return "🌤"
-        elif weather_main in ['clouds', 'partly cloudy']:
+            return "🔥" if temp >= 30 else ("☀" if temp >= 25 else "🌤")
+        elif weather_main in ['clouds']:
             return "☁"
         elif weather_main in ['rain', 'drizzle']:
             return "🌧"
@@ -1339,18 +1330,8 @@ video dosyası koyun."""
             scaled_pixmap = pixmap.scaled(160, 160, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.qr_label.setPixmap(scaled_pixmap)
             
-            print("✅ QR kodu oluşturuldu")
-            
         except Exception as e:
             self.qr_label.setText("QR\nHatası")
-            self.qr_label.setStyleSheet(f"""
-                background-color: {self.colors['text_primary']};
-                color: {self.colors['bg_primary']};
-                font-size: 16px;
-                font-weight: bold;
-                border: none;
-                border-radius: 12px;
-            """)
             print(f"QR kod hatası: {e}")
 
     def keyPressEvent(self, event):
@@ -1362,9 +1343,31 @@ video dosyası koyun."""
                 self.showNormal()
             else:
                 self.showFullScreen()
+        elif event.key() == Qt.Key_R:
+            # Manuel yenileme
+            print("🔄 Manuel yenileme...")
+            self.fetch_data()
+            self.fetch_weather_data()
 
+    def closeEvent(self, event):
+        """Uygulama kapatılırken"""
+        # Worker thread'leri durdur
+        if self.pharmacy_worker and self.pharmacy_worker.isRunning():
+            self.pharmacy_worker.terminate()
+        if self.weather_worker and self.weather_worker.isRunning():
+            self.weather_worker.terminate()
+        if self.map_worker and self.map_worker.isRunning():
+            self.map_worker.terminate()
+        
+        event.accept()
+
+
+# ============================================================================
+# 🚀 MAIN
+# ============================================================================
 if __name__ == "__main__":
-    print("🌐 HTTP SERVER + LOTTIE ANIMATIONS - CORS FREE!")
+    print("=" * 70)
+    print("🏥 KARŞIYAKA 4 NÖBETÇİ ECZANE SİSTEMİ")
     print("=" * 70)
     
     app = QApplication(sys.argv)
@@ -1373,25 +1376,23 @@ if __name__ == "__main__":
     
     try:
         window = ModernCorporateEczaneApp()
-        print("✅ HTTP Server + Lottie sistemi başlatıldı")
-        print("🌐 Server: http://localhost:8000-8009 (otomatik port)")
-        print("📁 Lottie dosyaları: weather_lottie/*.json")
-        print("🔧 CORS sorunu %100 çözüldü!")
-        print("🎬 Console mesajları gizlendi")
-        print("⌨️  ESC: Çıkış, F11: Tam ekran")
-        print("=" * 70)
-        print("🚀 HTTP SERVER LOTTIE SİSTEMİ AKTİF!")
-        print("📊 Status:")
-        print("   ✅ Otomatik port bulma")
-        print("   ✅ CORS bypass")
-        print("   ✅ Console gizleme") 
-        print("   ✅ Fallback emoji sistemi")
-        print("   ✅ 22x22 optimum boyut")
-        print("   ✅ Tam eczane bilgi sistemi")
+        
+        print("\n📊 Sistem Durumu:")
+        print("   ✅ Worker Thread - UI donması önlendi")
+        print("   ✅ Cumartesi 16:00 nöbet desteği")
+        print("   ✅ HTTP Server + Lottie")
         print("   ✅ SVG ikonlar + QR kod + Harita")
+        print("\n⌨️  Kısayollar:")
+        print("   ESC  : Çıkış")
+        print("   F11  : Tam ekran")
+        print("   R    : Manuel yenileme")
+        print("\n🕐 Nöbet Saatleri:")
+        print("   Pazartesi-Cuma : 18:45 - 08:45")
+        print("   Cumartesi      : 16:00 - 08:45")
+        print("   Pazar          : Tüm gün")
         print("=" * 70)
         
-        app.exec_()
+        sys.exit(app.exec_())
         
     except Exception as e:
         print(f"❌ Hata: {e}")
