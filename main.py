@@ -278,9 +278,9 @@ class ModernCorporateEczaneApp(QMainWindow):
         # 🎨 MODERN CORPORATE RENK PALETİ
         self.colors = {
             'bg_primary': '#000000',
-            'bg_secondary': '#111111',
-            'bg_card': '#1a1a1a',
-            'bg_accent': '#222222',
+            'bg_secondary': '#000000',
+            'bg_card': '#000000',
+            'bg_accent': '#000000',
             'text_primary': '#ffffff',
             'text_secondary': '#cccccc',
             'text_muted': '#888888',
