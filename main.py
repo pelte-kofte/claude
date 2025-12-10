@@ -546,11 +546,10 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.load_logo()
         self.logo_label.setStyleSheet("""
             background: transparent;
-            border-radius: 35px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 35px;   
         """)
         self.logo_label.setAlignment(Qt.AlignCenter)
-        self.logo_label.setFixedSize(70, 70)
+        self.logo_label.setFixedSize(90, 90)
         left_layout.addWidget(self.logo_label)
         
         title_widget = QWidget()
@@ -882,7 +881,7 @@ class ModernCorporateEczaneApp(QMainWindow):
                 if os.path.exists(path):
                     pixmap = QPixmap(path)
                     if not pixmap.isNull():
-                        scaled_logo = pixmap.scaled(60, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                        scaled_logo = pixmap.scaled(85, 85, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                         self.logo_label.setPixmap(scaled_logo)
                         return
             
