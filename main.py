@@ -471,6 +471,13 @@ class ModernCorporateEczaneApp(QMainWindow):
                 background-color: {self.colors['bg_primary']};
                 font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
                 color: {self.colors['text_primary']};
+                border: none;
+            }}
+            QLabel {{
+                border: none;
+            }}
+            QFrame {{
+                    border: none;
             }}
         """)
         
@@ -587,13 +594,13 @@ class ModernCorporateEczaneApp(QMainWindow):
         datetime_row_layout.addStretch()
         
         self.time_display = QLabel()
-        self.time_display.setFont(QFont('Segoe UI', 18, QFont.Bold))
+        self.time_display.setFont(QFont('Segoe UI', 18, QFont.Normal))
         self.time_display.setStyleSheet("color: white; background: transparent;")
         datetime_row_layout.addWidget(self.time_display)
         
         bullet = QLabel("•")
-        bullet.setFont(QFont('Segoe UI', 18, QFont.Bold))
-        bullet.setStyleSheet("color: rgba(255, 255, 255, 0.8); background: transparent; padding-bottom: 15px;")
+        bullet.setFont(QFont('Segoe UI', 18, QFont.Normal))
+        bullet.setStyleSheet("color: rgba(255, 255, 255, 0.8); background: transparent; padding-bottom: 1px;")
         datetime_row_layout.addWidget(bullet)
         
         self.date_display = QLabel()
@@ -606,7 +613,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         # Weather satırı
         weather_row = QWidget()
         weather_row.setFixedHeight(30)
-        weather_row.setStyleSheet("background: transparent;")
+        weather_row.setStyleSheet("background: transparent; border: none;")
         weather_row_layout = QHBoxLayout(weather_row)
         weather_row_layout.setSpacing(8)
         weather_row_layout.setContentsMargins(0, 0, 0, 0)
@@ -615,8 +622,8 @@ class ModernCorporateEczaneApp(QMainWindow):
         weather_row_layout.addWidget(self.lottie_widget)
         
         self.weather_temp = QLabel("--°C")
-        self.weather_temp.setFont(QFont('Segoe UI', 16, QFont.Bold))
-        self.weather_temp.setStyleSheet("color: white; background: transparent;")
+        self.weather_temp.setFont(QFont('Segoe UI', 16, QFont.Normal))
+        self.weather_temp.setStyleSheet("color: white; background: transparent; none;")
         weather_row_layout.addWidget(self.weather_temp)
         
         self.weather_icon = QLabel("☀")
@@ -665,10 +672,19 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         # SOL: Eczane bilgileri
         self.info_widget = QWidget()
-        self.info_widget.setStyleSheet(f"""
-            background-color: {self.colors['bg_secondary']};
-            border-radius: 12px;
-            padding: 24px;
+        self.info_widget.setObjectName("infoWidget")
+        self.info_widget.setStyleSheet("""
+            QWidget#infoWidget {
+                background: transparent;
+                border: 1px solid #333333;
+                border-radius: 12px;
+            }
+            QWidget#infoWidget > QWidget {
+                border: none;
+            }
+            QWidget#infoWidget QLabel {
+                border: none;
+            }
         """)
         
         self.info_widget_layout = QVBoxLayout(self.info_widget)
@@ -684,7 +700,20 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         # SAĞ: QR Kod
         qr_widget = QWidget()
-        qr_widget.setStyleSheet("background: transparent;")
+        qr_widget.setObjectName("qrWidget")
+        qr_widget.setStyleSheet("""
+            QWidget#qrWidget {
+                background: transparent;
+                border: 1px solid #333333;
+                border-radius: 12px;
+            }
+            QWidget#qrWidget > QWidget {
+                border: none;
+            }
+            QWidget#qrWidget QLabel {
+                border: none;
+            }
+        """)
         qr_widget_layout = QVBoxLayout(qr_widget)
         qr_widget_layout.setSpacing(12)
         qr_widget_layout.setContentsMargins(0, 0, 0, 0)
