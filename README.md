@@ -1,7 +1,10 @@
 # Claude - Nöbetçi Eczane Gösterge Sistemi
 
 Modern ve şık tasarımlı nöbetçi eczane bilgi sistemi. PyQt5 tabanlı bu uygulama, İzmir Eczacı Odası'ndan nöbetçi eczane bilgilerini çekerek arayüzde gösterir.
-
+git push yapma
+git add .
+git commit -m "Worker thread + Cumartesi 16:00 desteği"
+git push
 ## 🌟 Özellikler
 
 ###
@@ -206,12 +209,20 @@ class CORSHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', '*')
         super().end_headers()
 ```
+### GOOGLEMAPS GECE MODUİÇİN 
 
-### Şeffaf Arkaplan
-```python
-# WebEngine sayfası şeffaf yapma
-page.setBackgroundColor(QColor(0, 0, 0, 0))
-```
+fetch_map_data fonksiyonunu bul (DataFetchWorker class içinde), static_map_url kısmındaki style'ları sil veya değiştir.
+Bul:
+pythonf"style=feature:all|element:geometry|color:0x1a1a1a&"
+f"style=feature:all|element:labels.icon|visibility:off&"
+f"style=feature:all|element:labels.text.fill|color:0xcccccc&"
+f"style=feature:all|element:labels.text.stroke|color:0x000000&"
+f"style=feature:road|element:geometry|color:0x333333&"
+f"style=feature:road|element:geometry.stroke|color:0x222222&"
+f"style=feature:road|element:labels.text.fill|color:0xffffff&"
+f"style=feature:water|element:geometry|color:0x007AFF&"
+f"style=feature:landscape|element:geometry|color:0x111111&"
+
 
 ## 📊 GÜNCELLEME SIKLIĞI
 
