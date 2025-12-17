@@ -9,6 +9,7 @@ import requests
 from bs4 import BeautifulSoup
 import qrcode
 from io import BytesIO
+from PyQt5.QtGui import QPainterPath
 from datetime import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -1147,8 +1148,19 @@ Desteklenen formatlar:
                 painter.drawText(18, scaled_pixmap.height() - 24, "↗")
                 
                 painter.end()
-                
-                self.map_label.setPixmap(scaled_pixmap)
+
+                rounded_pixmap = QPixmap(scaled_pixmap.size())
+                rounded_pixmap.fill(Qt.transparent)
+
+                painter2 = QPainter(rounded_pixmap)
+                painter2.setRenderHint(QPainter.Antialiasing)
+                path = QPainterPath()
+                path.addRoundedRect(0, 0, scaled_pixmap.width(), scaled_pixmap.height(), 12, 12)
+                painter2.setClipPath(path)
+                painter2.drawPixmap(0, 0, scaled_pixmap)
+                painter2.end()
+
+                self.map_label.setPixmap(rounded_pixmap)
             
         except Exception as e:
             print(f"❌ Harita gösterme hatası: {e}")
