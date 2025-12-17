@@ -186,15 +186,6 @@ class DataFetchWorker(QThread):
                         f"size={map_width}x{map_height}&"
                         f"maptype=roadmap&"
                         f"visible={start_lat},{start_lon}|{end_lat},{end_lon}&"
-                        f"style=feature:all|element:geometry|color:0x1a1a1a&"
-                        f"style=feature:all|element:labels.icon|visibility:off&"
-                        f"style=feature:all|element:labels.text.fill|color:0xcccccc&"
-                        f"style=feature:all|element:labels.text.stroke|color:0x000000&"
-                        f"style=feature:road|element:geometry|color:0x333333&"
-                        f"style=feature:road|element:geometry.stroke|color:0x222222&"
-                        f"style=feature:road|element:labels.text.fill|color:0xffffff&"
-                        f"style=feature:water|element:geometry|color:0x007AFF&"
-                        f"style=feature:landscape|element:geometry|color:0x111111&"
                         f"markers=color:blue|size:mid|label:B|{start_lat},{start_lon}&"
                         f"markers=color:red|size:mid|label:E|{end_lat},{end_lon}&"
                         f"path=color:0x007AFF|weight:5|enc:{polyline}&"
@@ -675,7 +666,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.info_widget.setObjectName("infoWidget")
         self.info_widget.setStyleSheet("""
             QWidget#infoWidget {
-                background: transparent;
+                background: #141414;
                 border: 0.5px solid #333333;
                 border-radius: 12px;
             }
@@ -703,7 +694,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         qr_widget.setObjectName("qrWidget")
         qr_widget.setStyleSheet("""
             QWidget#qrWidget {
-                background: transparent;
+                background: #141414;
                 border: 0.5px solid #333333;
                 border-radius: 12px;
             }
@@ -773,15 +764,15 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.info_widget_layout.addWidget(phone_row)
         
         # ADRES
-        address_row = self.create_info_row("icons/location.svg", "📍", address, self.colors['accent_red'], wrap=True)
+        address_row = self.create_info_row("icons/mappin.svg", "📍", address, self.colors['accent_red'], wrap=True)
         self.info_widget_layout.addWidget(address_row)
         
         # MESAFE
-        distance_row = self.create_info_row("icons/distance.svg", "🚗", f"Mesafe: {distance}", self.colors['accent_green'])
+        distance_row = self.create_info_row("icons/navigation.svg", "🚗", f"Mesafe: {distance}", self.colors['accent_green'])
         self.info_widget_layout.addWidget(distance_row)
         
         # SÜRE
-        time_row = self.create_info_row("icons/time.svg", "⏱️", f"Süre: {duration}", self.colors['accent_purple'])
+        time_row = self.create_info_row("icons/clock.svg", "⏱️", f"Süre: {duration}", self.colors['accent_purple'])
         self.info_widget_layout.addWidget(time_row)
 
     def create_info_row(self, svg_path, fallback_emoji, text, color, wrap=False):
@@ -815,90 +806,44 @@ class ModernCorporateEczaneApp(QMainWindow):
 
     def create_corporate_qr_map_section(self, layout):
         """🗺️ HARİTA SECTION"""
-        map_container = QWidget()
-        map_container.setStyleSheet(f"""
-            background-color: {self.colors['bg_card']};
-            border-radius: 16px;
-        """)
-        
-        map_layout = QVBoxLayout(map_container)
-        map_layout.setContentsMargins(24, 24, 24, 24)
-        map_layout.setSpacing(16)
-        
-        map_title = QLabel("KONUM & ROTA")
-        map_title.setFont(QFont('Geist', 18, QFont.Normal))
-        map_title.setAlignment(Qt.AlignCenter)
-        map_title.setStyleSheet(f"""
-            color: {self.colors['text_primary']};
-            background-color: {self.colors['bg_accent']};
-            padding: 12px 20px;
-            border-radius: 12px;
-        """)
-        map_layout.addWidget(map_title)
-        
-        # LEJANT
-        legend_widget = QWidget()
-        legend_widget.setStyleSheet("background: transparent;")
-        legend_layout = QHBoxLayout(legend_widget)
-        legend_layout.setContentsMargins(0, 0, 0, 0)
-        legend_layout.setSpacing(40)
-        
-        legend_layout.addStretch()
-        
-        start_legend = QLabel("🔵 B: Buradasınız")
-        start_legend.setFont(QFont('Geist', 12, QFont.Normal))
-        start_legend.setStyleSheet(f"color: {self.colors['text_secondary']};")
-        legend_layout.addWidget(start_legend)
-        
-        legend_layout.addStretch()
-        
-        end_legend = QLabel("🔴 E: Nöbetçi Eczane")
-        end_legend.setFont(QFont('Geist', 12, QFont.Normal))
-        end_legend.setStyleSheet(f"color: {self.colors['text_secondary']};")
-        legend_layout.addWidget(end_legend)
-        
-        legend_layout.addStretch()
-        
-        map_layout.addWidget(legend_widget)
-        
-        # HARİTA LABEL
         self.map_label = QLabel("⏳ Harita yükleniyor...")
         self.map_label.setAlignment(Qt.AlignCenter)
-        self.map_label.setMinimumHeight(570)
-        self.map_label.setMaximumHeight(570)
+        self.map_label.setFixedHeight(570)
         self.map_label.setStyleSheet(f"""
             background-color: {self.colors['bg_secondary']};
             border-radius: 12px;
             color: {self.colors['text_muted']};
             font-size: 16px;
         """)
-        map_layout.addWidget(self.map_label)
-        
-        layout.addWidget(map_container)
+        layout.addWidget(self.map_label)
+    
+        # destination_label hala lazım (on_map_data_ready'de kullanılıyor)
+        self.destination_label = QLabel("Nöbetçi Eczane")
+        self.destination_label.hide()  # Gizli, sadece veri tutmak için
 
     def create_corporate_footer(self, layout):
         """🏢 FOOTER"""
         footer = QWidget()
-        footer.setFixedHeight(60)
+        footer.setFixedHeight(50)
         footer.setStyleSheet(f"""
-            background-color: {self.colors['bg_card']};
-            border-radius: 16px;
+            background: transparent;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
         """)
         
         footer_layout = QHBoxLayout(footer)
-        footer_layout.setContentsMargins(32, 16, 32, 16)
+        footer_layout.setContentsMargins(0, 16, 0, 0)
         
-        self.last_update_label = QLabel("Son güncelleme: --:--")
-        self.last_update_label.setFont(QFont('Geist', 14, QFont.Normal))
-        self.last_update_label.setStyleSheet(f"color: {self.colors['text_secondary']}; background: transparent;")
-        footer_layout.addWidget(self.last_update_label)
+        left_text = QLabel("Veriler İzmir Eczacıları Odası'ndan otomatik olarak güncellenmektedir.")
+        left_text.setFont(QFont('Geist', 11))
+        left_text.setStyleSheet("color: rgba(255, 255, 255, 0.3); background: transparent;")
+        footer_layout.addWidget(left_text)
         
         footer_layout.addStretch()
         
-        self.status_label = QLabel("● Sistem Aktif")
-        self.status_label.setFont(QFont('Geist', 14, QFont.Normal))
-        self.status_label.setStyleSheet(f"color: {self.colors['accent_green']}; background: transparent;")
-        footer_layout.addWidget(self.status_label)
+        right_text = QLabel("izmireczaciodasi.org.tr")
+        right_text.setFont(QFont('Geist', 11))
+        right_text.setStyleSheet("color: rgba(255, 255, 255, 0.3); background: transparent;")
+        footer_layout.addWidget(right_text)
         
         layout.addWidget(footer)
 
@@ -1117,12 +1062,13 @@ Desteklenen formatlar:
         """✅ Eczane verisi geldi - UI güncelle"""
         if data.get('found'):
             name = data['name']
+            if hasattr(self, 'destination_label'):
+                    self.destination_label.setText(name)
             phone = data['phone']
             address = data['address']
             maps_url = data['maps_url']
             self.end_lat = data['end_lat']
-            self.end_lon = data['end_lon']
-            
+            self.end_lon = data['end_lon']   
             # Önce mesafe/süre olmadan göster
             self.create_svg_info_display(name, phone, address, "Hesaplanıyor...", "Hesaplanıyor...")
             
@@ -1131,11 +1077,11 @@ Desteklenen formatlar:
                 self.create_qr_code(maps_url)
             
             # Harita için worker başlat
-            self.fetch_map_data()
+            self.fetch_map_data()   
             
             # Son güncelleme
             now = datetime.now()
-            self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')}")
+            # self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')}")
             
             print(f"✅ Eczane bulundu: {name}")
         else:
@@ -1163,22 +1109,46 @@ Desteklenen formatlar:
     def on_map_data_ready(self, data):
         """✅ Harita verisi geldi"""
         try:
-            # Harita göster
             map_bytes = data.get('map_data')
             if map_bytes:
                 pixmap = QPixmap()
                 pixmap.loadFromData(map_bytes)
                 scaled_pixmap = pixmap.scaled(820, 550, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                
+                # Overlay'i pixmap üzerine çiz
+                from PyQt5.QtGui import QPainter, QLinearGradient, QPen
+                
+                painter = QPainter(scaled_pixmap)
+                painter.setRenderHint(QPainter.Antialiasing)
+                
+                # Gradient overlay
+                gradient = QLinearGradient(0, scaled_pixmap.height() - 60, 0, scaled_pixmap.height())
+                gradient.setColorAt(0, QColor(0, 0, 0, 0))
+                gradient.setColorAt(0.5, QColor(0, 0, 0, 180))
+                gradient.setColorAt(1, QColor(0, 0, 0, 240))
+                
+                painter.fillRect(0, scaled_pixmap.height() - 60, scaled_pixmap.width(), 60, gradient)
+                
+                # Yazıları çiz
+                painter.setPen(QColor(255, 255, 255, 100))
+                painter.setFont(QFont('Geist', 8))
+                painter.drawText(50, scaled_pixmap.height() - 38, "ROTA")
+                
+                painter.setPen(QColor(255, 255, 255, 150))
+                painter.setFont(QFont('Geist', 11))
+                painter.drawText(50, scaled_pixmap.height() - 18, f"Eczaneniz → {self.destination_label.text()}")
+                
+                # İkon kutusu
+                painter.setPen(QPen(QColor(255, 255, 255, 80), 1))
+                painter.drawRoundedRect(10, scaled_pixmap.height() - 48, 32, 32, 4, 4)
+                
+                painter.setPen(QColor(255, 255, 255, 255))
+                painter.setFont(QFont('Geist', 14))
+                painter.drawText(18, scaled_pixmap.height() - 24, "↗")
+                
+                painter.end()
+                
                 self.map_label.setPixmap(scaled_pixmap)
-            
-            # Mesafe/süre güncelle (info widget'ta)
-            distance = data.get('distance', '~2 km')
-            duration = data.get('duration', '~5 dakika')
-            
-            # Mevcut bilgileri al ve güncelle
-            self.update_distance_duration(distance, duration)
-            
-            print(f"✅ Harita yüklendi - {distance}, {duration}")
             
         except Exception as e:
             print(f"❌ Harita gösterme hatası: {e}")
