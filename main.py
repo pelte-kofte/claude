@@ -7,6 +7,7 @@ import sys
 import os
 import requests
 from bs4 import BeautifulSoup
+from PyQt5.QtGui import QPainterPath
 import qrcode
 from io import BytesIO
 from PyQt5.QtGui import QPainterPath
@@ -113,7 +114,9 @@ class DataFetchWorker(QThread):
             self.pharmacy_data_ready.emit({'found': False})
             
         except Exception as e:
-            self.error_occurred.emit(f"Eczane verisi hatası: {e}")
+            # Hata olursa boş sinyal gönder (UI son veriyi korur)
+            print(f"⚠️ Site erişilemedi: {e}")
+            self.pharmacy_data_ready.emit({'found': False, 'keep_current': True})
     
     def fetch_weather_data(self):
         """🌤️ Hava durumu çek"""
@@ -177,8 +180,8 @@ class DataFetchWorker(QThread):
                     duration = duration.replace('mins', 'dakika').replace('min', 'dakika')
                     duration = duration.replace('hours', 'saat').replace('hour', 'saat')
                     
-                    map_width = 820
-                    map_height = 550
+                    map_width = 850
+                    map_height = 550    
                     
                     # Static Map URL - ZOOM YOK, OTOMATİK FIT
                     # Google Maps markers ve path'e göre otomatik zoom yapar
@@ -742,7 +745,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         info_layout.addWidget(content_row)
         layout.addWidget(info_container)
 
-    def create_svg_info_display(self, name, phone, address, distance, duration):
+    def create_svg_info_display(self, name, phone, address, distancex):
         """📱 BİLGİ DISPLAY"""
         # Mevcut widget'ları temizle
         for i in reversed(range(self.info_widget_layout.count())): 
@@ -769,11 +772,10 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.info_widget_layout.addWidget(address_row)
         
         # MESAFE
-        distance_row = self.create_info_row("icons/navigation.svg", "🚗", f"Mesafe: {distance}", self.colors['accent_green'])
+        distance_row = self.create_info_row("icons/navigation.svg", "🚗", "Mesafe: Hesaplanıyor...", self.colors['accent_green'])
         self.info_widget_layout.addWidget(distance_row)
-        
-        # SÜRE
-        time_row = self.create_info_row("icons/clock.svg", "⏱️", f"Süre: {duration}", self.colors['accent_purple'])
+        # NÖBET SAATLERİ
+        time_row = self.create_info_row("icons/time.svg", "⏱️", "Nöbet: 19:00 - 09:00", self.colors['accent_purple'])
         self.info_widget_layout.addWidget(time_row)
 
     def create_info_row(self, svg_path, fallback_emoji, text, color, wrap=False):
@@ -1061,6 +1063,9 @@ Desteklenen formatlar:
 
     def on_pharmacy_data_ready(self, data):
         """✅ Eczane verisi geldi - UI güncelle"""
+        if data.get('keep_current'):
+            print("⚠️ Site erişilemedi, mevcut veri korunuyor")
+            return
         if data.get('found'):
             name = data['name']
             if hasattr(self, 'destination_label'):
@@ -1071,7 +1076,7 @@ Desteklenen formatlar:
             self.end_lat = data['end_lat']
             self.end_lon = data['end_lon']   
             # Önce mesafe/süre olmadan göster
-            self.create_svg_info_display(name, phone, address, "Hesaplanıyor...", "Hesaplanıyor...")
+            self.create_svg_info_display(name, phone, address, "Hesaplanıyor...")
             
             # QR kod oluştur
             if maps_url:
@@ -1114,7 +1119,7 @@ Desteklenen formatlar:
             if map_bytes:
                 pixmap = QPixmap()
                 pixmap.loadFromData(map_bytes)
-                scaled_pixmap = pixmap.scaled(820, 550, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                scaled_pixmap = pixmap.scaled(850, 550, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 
                 # Overlay'i pixmap üzerine çiz
                 from PyQt5.QtGui import QPainter, QLinearGradient, QPen
@@ -1149,6 +1154,12 @@ Desteklenen formatlar:
                 
                 painter.end()
 
+                distance = data.get('distance', '~2 km')
+                duration = data.get('duration', '~5 dakika')
+
+                # Mesafe güncelle
+                self.update_distance_duration(distance, duration)
+
                 rounded_pixmap = QPixmap(scaled_pixmap.size())
                 rounded_pixmap.fill(Qt.transparent)
 
@@ -1167,24 +1178,17 @@ Desteklenen formatlar:
             self.map_label.setText("❌ Harita yüklenemedi")
 
     def update_distance_duration(self, distance, duration):
-        """Mesafe ve süre bilgisini güncelle"""
-        # Info widget'taki label'ları bul ve güncelle
+        """Mesafe bilgisini güncelle"""
         for i in range(self.info_widget_layout.count()):
             widget = self.info_widget_layout.itemAt(i).widget()
-            if widget:
-                # QHBoxLayout içindeki QLabel'ları bul
-                layout = widget.layout()
-                if layout:
-                    for j in range(layout.count()):
-                        item = layout.itemAt(j)
-                        if item and item.widget():
-                            label = item.widget()
-                            if isinstance(label, QLabel):
-                                text = label.text()
-                                if "Mesafe:" in text:
-                                    label.setText(f"Mesafe: {distance}")
-                                elif "Süre:" in text:
-                                    label.setText(f"Süre: {duration}")
+            if widget and widget.layout():
+                for j in range(widget.layout().count()):
+                    item = widget.layout().itemAt(j)
+                    if item and item.widget() and isinstance(item.widget(), QLabel):
+                        text = item.widget().text()
+                        if "Mesafe:" in text or "Hesaplanıyor" in text:
+                            item.widget().setText(f"Mesafe: {distance}")
+                            return
 
     def on_map_error(self, error_msg):
         """Harita hatası"""
@@ -1338,7 +1342,20 @@ Desteklenen formatlar:
             pixmap.loadFromData(buffer.getvalue())
             
             scaled_pixmap = pixmap.scaled(160, 160, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.qr_label.setPixmap(scaled_pixmap)
+            from PyQt5.QtGui import QPainterPath
+
+            rounded_pixmap = QPixmap(scaled_pixmap.size())
+            rounded_pixmap.fill(Qt.transparent)
+
+            painter = QPainter(rounded_pixmap)
+            painter.setRenderHint(QPainter.Antialiasing)
+            path = QPainterPath()
+            path.addRoundedRect(0, 0, scaled_pixmap.width(), scaled_pixmap.height(), 12, 12)
+            painter.setClipPath(path)
+            painter.drawPixmap(0, 0, scaled_pixmap)
+            painter.end()
+
+            self.qr_label.setPixmap(rounded_pixmap)
             
         except Exception as e:
             self.qr_label.setText("QR\nHatası")
