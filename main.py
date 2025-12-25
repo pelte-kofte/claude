@@ -745,6 +745,70 @@ class ModernCorporateEczaneApp(QMainWindow):
         info_layout.addWidget(content_row)
         layout.addWidget(info_container)
 
+    def get_nobet_saati(self):
+        """Nöbet saatini hesapla - özel günlerde 24 saat, arefelerde 13:00'dan itibaren"""
+        from datetime import datetime
+        
+        now = datetime.now()
+        gun = now.weekday()  # 0=Pazartesi, 6=Pazar
+        ay = now.month
+        gun_sayi = now.day
+        yil = now.year
+        
+        # Pazar günü
+        if gun == 6:
+            return "Nöbet: 24 Saat"
+        
+        # Resmi tatiller (24 saat)
+        resmi_tatiller = [
+            (1, 1),    # Yılbaşı
+            (4, 23),   # 23 Nisan
+            (5, 1),    # 1 Mayıs
+            (5, 19),   # 19 Mayıs
+            (7, 15),   # 15 Temmuz
+            (8, 30),   # 30 Ağustos
+            (10, 29),  # 29 Ekim
+        ]
+        
+        if (ay, gun_sayi) in resmi_tatiller:
+            return "Nöbet: 24 Saat"
+        
+        # Arefe günleri (13:00'dan itibaren)
+        arefe_gunleri = [
+            (10, 28),  # 29 Ekim arefesi
+            (12, 31),  # Yılbaşı arefesi
+        ]
+        
+        # Dini bayram arefeleri 2025
+        dini_arefe = {
+            2025: [(3, 29), (6, 5)],
+            2026: [(3, 19), (5, 26)],
+        }
+
+        if yil in dini_arefe and (ay, gun_sayi) in dini_arefe[yil]:
+            return "Nöbet: 13:00 - 09:00"
+        
+        if (ay, gun_sayi) in arefe_gunleri:
+            return "Nöbet: 13:00 - 09:00"
+        
+        # Dini bayramlar 2025 (24 saat)
+        dini_bayramlar = {
+            2025: [
+                (3, 30), (3, 31), (4, 1),  # Ramazan Bayramı 2025
+                (6, 6), (6, 7), (6, 8), (6, 9),  # Kurban Bayramı 2025
+            ],
+            2026: [
+                (3, 20), (3, 21), (3, 22),  # Ramazan Bayramı 2026
+                (5, 27), (5, 28), (5, 29), (5, 30),  # Kurban Bayramı 2026
+            ]
+        }
+        
+        if yil in dini_bayramlar and (ay, gun_sayi) in dini_bayramlar[yil]:
+            return "Nöbet: 24 Saat"
+
+        # Normal gün
+        return "Nöbet: 19:00 - 09:00"
+
     def create_svg_info_display(self, name, phone, address, distancex):
         """📱 BİLGİ DISPLAY"""
         # Mevcut widget'ları temizle
@@ -871,7 +935,7 @@ class ModernCorporateEczaneApp(QMainWindow):
     def update_time(self):
         """Saat ve tarih güncelle"""
         now = datetime.now()
-        self.time_display.setText(now.strftime("%H:%M:%S"))
+        self.time_display.setText(now.strftime("%H:%M"))
         self.date_display.setText(now.strftime("%d.%m.%Y"))
 
     def setup_video_ui(self):
@@ -979,33 +1043,59 @@ Desteklenen formatlar:
             self.pulse_state = not self.pulse_state
 
     def check_schedule_and_switch(self):
-        """
-        🕐 NÖBET SAATLERİ KONTROLÜ
-        
-        Hafta içi (Pazartesi-Cuma): 18:45 - 08:45
-        Cumartesi: 16:00 - 08:45 (ertesi gün)
-        Pazar: TÜM GÜN
-        """
+        """🕐 NÖBET SAATLERİ KONTROLÜ"""
         now = datetime.now()
         current_time = now.time()
-        current_day = now.weekday()  # 0=Pazartesi, 5=Cumartesi, 6=Pazar
+        current_day = now.weekday()  # 0=Pazartesi, 6=Pazar
+        ay = now.month
+        gun_sayi = now.day
+        yil = now.year
         
         # Saatleri tanımla
-        time_0845 = datetime.strptime("08:45", "%H:%M").time()
-        time_1600 = datetime.strptime("16:00", "%H:%M").time()
-        time_1845 = datetime.strptime("18:45", "%H:%M").time()
+        time_0900 = datetime.strptime("09:00", "%H:%M").time()
+        time_1300 = datetime.strptime("13:00", "%H:%M").time()
+        time_1900 = datetime.strptime("19:00", "%H:%M").time()
         
         should_show_pharmacy = False
         
-        if current_day == 6:  # PAZAR - TÜM GÜN
+        # Resmi tatiller (24 saat)
+        resmi_tatiller = [
+            (1, 1), (4, 23), (5, 1), (5, 19),
+            (7, 15), (8, 30), (10, 29),
+        ]
+        
+        # Dini bayramlar
+        dini_bayramlar = {
+            2025: [(3, 30), (3, 31), (4, 1), (6, 6), (6, 7), (6, 8), (6, 9)],
+            2026: [(3, 20), (3, 21), (3, 22), (5, 27), (5, 28), (5, 29), (5, 30)],
+        }
+        
+        # Arefe günleri
+        arefe_gunleri = [(10, 28), (12, 31)]
+        dini_arefe = {
+            2025: [(3, 29), (6, 5)],
+            2026: [(3, 19), (5, 26)],
+        }
+        
+        # PAZAR veya RESMİ TATİL veya DİNİ BAYRAM → 24 SAAT
+        if current_day == 6:
             should_show_pharmacy = True
-            
-        elif current_day == 5:  # CUMARTESİ - 16:00'dan itibaren
-            if current_time >= time_1600 or current_time <= time_0845:
+        elif (ay, gun_sayi) in resmi_tatiller:
+            should_show_pharmacy = True
+        elif yil in dini_bayramlar and (ay, gun_sayi) in dini_bayramlar[yil]:
+            should_show_pharmacy = True
+        
+        # AREFE GÜNLERİ → 13:00'dan itibaren
+        elif (ay, gun_sayi) in arefe_gunleri:
+            if current_time >= time_1300 or current_time < time_0900:
                 should_show_pharmacy = True
-                
-        else:  # HAFTA İÇİ (Pazartesi-Cuma) - 18:45'ten itibaren
-            if current_time >= time_1845 or current_time <= time_0845:
+        elif yil in dini_arefe and (ay, gun_sayi) in dini_arefe[yil]:
+            if current_time >= time_1300 or current_time < time_0900:
+                should_show_pharmacy = True
+        
+        # NORMAL GÜNLER → 19:00 - 09:00
+        else:
+            if current_time >= time_1900 or current_time < time_0900:
                 should_show_pharmacy = True
         
         # Mod değişimi
