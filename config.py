@@ -3,9 +3,9 @@ from PyQt5.QtCore import QTime
 from PyQt5.QtGui import QFont
 
 class Config:
-    # API Keys - Direkt gömülü
-    GOOGLE_MAPS_API_KEY = "AIzaSyCIG70KV9YFvAoxlbqm3LqN_dRfuWZj-eE"
-    OPENWEATHER_API_KEY = "b0d1be7721b4967d8feb810424bd9b6f"
+    # API Keys - Environment variable'dan oku
+    GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_KEY") or os.environ.get("GOOGLE_MAPS_API_KEY", "")
+    OPENWEATHER_API_KEY = os.environ.get("OPENWEATHER_KEY") or os.environ.get("OPENWEATHER_API_KEY", "")
     
     # Bölge ayarları
     TARGET_REGION = "KARŞIYAKA 4"

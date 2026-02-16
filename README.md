@@ -27,8 +27,8 @@ Scraping detayları:
 - Mesafe ve süre gösterimi
 
 API Keys:
-- Google Maps: AIzaSyCIG70KV9YFvAoxlbqm3LqN_dRfuWZj-eE
-- OpenWeather: b0d1be7721b4967d8feb810424bd9b6f
+- Google Maps: YOUR_GOOGLE_MAPS_KEY
+- OpenWeather: YOUR_OPENWEATHER_KEY
 
 Status: ✅ FULL WORKING
 # 🔥 KARŞIYAKA 4 Nöbetçi Eczane Sistemi - Production Ready
@@ -142,8 +142,8 @@ python main.py
 
 ```python
 # API Anahtarları
-GOOGLE_MAPS_API = "AIzaSyCIG70KV9YFvAoxlbqm3LqN_dRfuWZj-eE"
-OPENWEATHER_API = "b0d1be7721b4967d8feb810424bd9b6f"
+GOOGLE_MAPS_API = "YOUR_GOOGLE_MAPS_KEY"
+OPENWEATHER_API = "YOUR_OPENWEATHER_KEY"
 
 # Başlangıç Koordinatları (Kuşdemir Eczanesi)
 START_LAT = 38.47434762293852
@@ -280,12 +280,12 @@ pip install -r requirements.txt
 4. **API anahtarlarını ayarlayın:**
 ```bash
 # Çevresel değişkenler olarak ayarlayın
-export GOOGLE_MAPS_API_KEY="your_google_maps_api_key"
-export OPENWEATHER_API_KEY="your_openweather_api_key"
+export GOOGLE_MAPS_KEY="your_google_maps_api_key"
+export OPENWEATHER_KEY="your_openweather_api_key"
 
 # Windows için:
-set GOOGLE_MAPS_API_KEY=your_google_maps_api_key
-set OPENWEATHER_API_KEY=your_openweather_api_key
+set GOOGLE_MAPS_KEY=your_google_maps_api_key
+set OPENWEATHER_KEY=your_openweather_api_key
 ```
 
 5. **Logo dosyasını ekleyin (opsiyonel):**

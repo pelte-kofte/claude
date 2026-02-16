@@ -236,6 +236,43 @@ class CORSHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+class RoundedCoverMapLabel(QLabel):
+    """Map image label that draws in cover mode while preserving aspect ratio."""
+
+    def __init__(self, *args, corner_radius=12, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._map_pixmap = None
+        self._corner_radius = corner_radius
+
+    def set_map_pixmap(self, pixmap):
+        self._map_pixmap = pixmap
+        self.update()
+
+    def clear_map_pixmap(self):
+        self._map_pixmap = None
+        self.update()
+
+    def paintEvent(self, event):
+        if not self._map_pixmap or self._map_pixmap.isNull():
+            super().paintEvent(event)
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), self._corner_radius, self._corner_radius)
+        painter.setClipPath(path)
+
+        scaled = self._map_pixmap.scaled(
+            self.size(),
+            Qt.KeepAspectRatioByExpanding,
+            Qt.SmoothTransformation,
+        )
+        x = (scaled.width() - self.width()) // 2
+        y = (scaled.height() - self.height()) // 2
+        painter.drawPixmap(-x, -y, scaled)
+
+
 # ============================================================================
 # 🏥 ANA UYGULAMA
 # ============================================================================
@@ -250,9 +287,13 @@ class ModernCorporateEczaneApp(QMainWindow):
         # 🌐 LOCAL HTTP SERVER BAŞLAT
         self.start_local_server()
         
-        # API anahtarları - Environment variable'dan al (güvenlik için)
-        self.api_key = os.environ.get('GOOGLE_MAPS_KEY', "AIzaSyCIG70KV9YFvAoxlbqm3LqN_dRfuWZj-eE")
-        self.weather_api_key = os.environ.get('OPENWEATHER_KEY', "b0d1be7721b4967d8feb810424bd9b6f")
+        # API anahtarları - sadece environment/config üzerinden al
+        self.api_key = os.environ.get('GOOGLE_MAPS_KEY') or os.environ.get('GOOGLE_MAPS_API_KEY')
+        self.weather_api_key = os.environ.get('OPENWEATHER_KEY') or os.environ.get('OPENWEATHER_API_KEY')
+        if not self.api_key:
+            print("Uyari: GOOGLE_MAPS_KEY veya GOOGLE_MAPS_API_KEY tanimli degil.")
+        if not self.weather_api_key:
+            print("Uyari: OPENWEATHER_KEY veya OPENWEATHER_API_KEY tanimli degil.")
         
         # Başlangıç koordinatları (Eczanenin konumu)
         self.start_lat = 38.47434762293852
@@ -264,6 +305,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         self.current_mode = None
         self.video_path = None
+        self.card_row_horizontal_margin = 32
         
         # Worker thread referansları
         self.pharmacy_worker = None
@@ -646,7 +688,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         """)
         
         info_layout = QVBoxLayout(info_container)
-        info_layout.setContentsMargins(32, 24, 32, 24)
+        info_layout.setContentsMargins(self.card_row_horizontal_margin, 24, self.card_row_horizontal_margin, 24)
         info_layout.setSpacing(20)
         
         title = QLabel("NÖBETÇİ ECZANE BİLGİLERİ")
@@ -873,7 +915,12 @@ class ModernCorporateEczaneApp(QMainWindow):
 
     def create_corporate_qr_map_section(self, layout):
         """🗺️ HARİTA SECTION"""
-        self.map_label = QLabel("⏳ Harita yükleniyor...")
+        map_row = QWidget()
+        map_row.setStyleSheet("background: transparent;")
+        map_row_layout = QHBoxLayout(map_row)
+        map_row_layout.setContentsMargins(self.card_row_horizontal_margin, 0, self.card_row_horizontal_margin, 0)
+
+        self.map_label = RoundedCoverMapLabel("Harita yukleniyor...")
         self.map_label.setAlignment(Qt.AlignCenter)
         self.map_label.setFixedHeight(570)
         self.map_label.setStyleSheet(f"""
@@ -882,7 +929,8 @@ class ModernCorporateEczaneApp(QMainWindow):
             color: {self.colors['text_muted']};
             font-size: 16px;
         """)
-        layout.addWidget(self.map_label)
+        map_row_layout.addWidget(self.map_label)
+        layout.addWidget(map_row)
     
         # destination_label hala lazım (on_map_data_ready'de kullanılıyor)
         self.destination_label = QLabel("Nöbetçi Eczane")
@@ -1188,7 +1236,8 @@ Desteklenen formatlar:
         if not self.end_lat or not self.end_lon:
             return
         
-        self.map_label.setText("⏳ Harita yükleniyor...")
+        self.map_label.clear_map_pixmap()
+        self.map_label.setText("Harita yukleniyor...")
         
         self.map_worker = DataFetchWorker(
             "map",
@@ -1209,38 +1258,38 @@ Desteklenen formatlar:
             if map_bytes:
                 pixmap = QPixmap()
                 pixmap.loadFromData(map_bytes)
-                scaled_pixmap = pixmap.scaled(850, 550, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                styled_pixmap = pixmap.copy()
                 
                 # Overlay'i pixmap üzerine çiz
                 from PyQt5.QtGui import QPainter, QLinearGradient, QPen
                 
-                painter = QPainter(scaled_pixmap)
+                painter = QPainter(styled_pixmap)
                 painter.setRenderHint(QPainter.Antialiasing)
                 
                 # Gradient overlay
-                gradient = QLinearGradient(0, scaled_pixmap.height() - 60, 0, scaled_pixmap.height())
+                gradient = QLinearGradient(0, styled_pixmap.height() - 60, 0, styled_pixmap.height())
                 gradient.setColorAt(0, QColor(0, 0, 0, 0))
                 gradient.setColorAt(0.5, QColor(0, 0, 0, 180))
                 gradient.setColorAt(1, QColor(0, 0, 0, 240))
                 
-                painter.fillRect(0, scaled_pixmap.height() - 60, scaled_pixmap.width(), 60, gradient)
+                painter.fillRect(0, styled_pixmap.height() - 60, styled_pixmap.width(), 60, gradient)
                 
                 # Yazıları çiz
                 painter.setPen(QColor(255, 255, 255, 100))
                 painter.setFont(QFont('Geist', 8))
-                painter.drawText(50, scaled_pixmap.height() - 38, "ROTA")
+                painter.drawText(50, styled_pixmap.height() - 38, "ROTA")
                 
                 painter.setPen(QColor(255, 255, 255, 150))
                 painter.setFont(QFont('Geist', 11))
-                painter.drawText(50, scaled_pixmap.height() - 18, f"Eczaneniz → {self.destination_label.text()}")
+                painter.drawText(50, styled_pixmap.height() - 18, f"Eczaneniz -> {self.destination_label.text()}")
                 
                 # İkon kutusu
                 painter.setPen(QPen(QColor(255, 255, 255, 80), 1))
-                painter.drawRoundedRect(10, scaled_pixmap.height() - 48, 32, 32, 4, 4)
+                painter.drawRoundedRect(10, styled_pixmap.height() - 48, 32, 32, 4, 4)
                 
                 painter.setPen(QColor(255, 255, 255, 255))
                 painter.setFont(QFont('Geist', 14))
-                painter.drawText(18, scaled_pixmap.height() - 24, "↗")
+                painter.drawText(18, styled_pixmap.height() - 24, "->")
                 
                 painter.end()
 
@@ -1249,22 +1298,12 @@ Desteklenen formatlar:
 
                 # Mesafe güncelle
                 self.update_distance_duration(distance, duration)
-
-                rounded_pixmap = QPixmap(scaled_pixmap.size())
-                rounded_pixmap.fill(Qt.transparent)
-
-                painter2 = QPainter(rounded_pixmap)
-                painter2.setRenderHint(QPainter.Antialiasing)
-                path = QPainterPath()
-                path.addRoundedRect(0, 0, scaled_pixmap.width(), scaled_pixmap.height(), 12, 12)
-                painter2.setClipPath(path)
-                painter2.drawPixmap(0, 0, scaled_pixmap)
-                painter2.end()
-
-                self.map_label.setPixmap(rounded_pixmap)
+                self.map_label.setText("")
+                self.map_label.set_map_pixmap(styled_pixmap)
             
         except Exception as e:
             print(f"❌ Harita gösterme hatası: {e}")
+            self.map_label.clear_map_pixmap()
             self.map_label.setText("❌ Harita yüklenemedi")
 
     def update_distance_duration(self, distance, duration):
@@ -1283,6 +1322,7 @@ Desteklenen formatlar:
     def on_map_error(self, error_msg):
         """Harita hatası"""
         print(f"❌ {error_msg}")
+        self.map_label.clear_map_pixmap()
         self.map_label.setText("❌ Harita yüklenemedi")
         self.map_label.setStyleSheet(f"""
             background-color: {self.colors['bg_secondary']};
