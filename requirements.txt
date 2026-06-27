@@ -1,4 +1,5 @@
-echo requests > requirements.txt
-echo beautifulsoup4 >> requirements.txt
-echo qrcode[pil] >> requirements.txt
-echo PyQt5 >> requirements.txt
+requests
+beautifulsoup4
+qrcode[pil]
+PyQt5
+python-dotenv

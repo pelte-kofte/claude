@@ -1,8 +1,9 @@
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
+from dotenv import load_dotenv
+load_dotenv()
 import http.server
 import socketserver
-from urllib.parse import urlparse
 import sys
 import os
 import requests
@@ -10,7 +11,6 @@ from bs4 import BeautifulSoup
 from PyQt5.QtGui import QPainterPath
 import qrcode
 from io import BytesIO
-from PyQt5.QtGui import QPainterPath
 from datetime import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -19,11 +19,8 @@ from PyQt5.QtMultimedia import *
 from PyQt5.QtMultimediaWidgets import *
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtGui import QColor 
 import threading
-import http.server
-import socketserver
-import time
+from config import Config, Colors, Fonts
 
 
 # ============================================================================
@@ -59,14 +56,18 @@ class DataFetchWorker(QThread):
         """📡 Eczane verisi çek"""
         try:
             url = "https://www.izmireczaciodasi.org.tr/nobetci-eczaneler"
-            r = requests.get(url, timeout=15)
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+            r = requests.get(url, headers=headers, timeout=15)
+            r.raise_for_status()
             soup = BeautifulSoup(r.text, 'html.parser')
             
             h4_elements = soup.find_all('h4', class_='red')
             
             for h4 in h4_elements:
                 strong = h4.find('strong')
-                if strong and 'KARŞIYAKA 4' in strong.text.upper():
+                if strong and Config.TARGET_REGION in strong.text.upper():
                     name = strong.text.strip()
                     parent_div = h4.parent
                     
@@ -89,7 +90,7 @@ class DataFetchWorker(QThread):
                     maps_url = maps_link.get('href') if maps_link else None
                     
                     # Koordinatlar
-                    end_lat, end_lon = 38.473137, 27.113438
+                    end_lat, end_lon = Config.DEFAULT_END_LAT, Config.DEFAULT_END_LON
                     if maps_url and 'q=' in maps_url:
                         try:
                             coords = maps_url.split('q=')[1].split('&')[0]
@@ -124,7 +125,7 @@ class DataFetchWorker(QThread):
             api_key = self.kwargs.get('api_key')
             url = f"http://api.openweathermap.org/data/2.5/weather"
             params = {
-                'q': 'Izmir,TR',
+                'q': Config.CITY_NAME + ",TR",
                 'appid': api_key,
                 'units': 'metric',
                 'lang': 'tr'
@@ -180,11 +181,9 @@ class DataFetchWorker(QThread):
                     duration = duration.replace('mins', 'dakika').replace('min', 'dakika')
                     duration = duration.replace('hours', 'saat').replace('hour', 'saat')
                     
-                    map_width = 850
-                    map_height = 550    
-                    
-                    # Static Map URL - ZOOM YOK, OTOMATİK FIT
-                    # Google Maps markers ve path'e göre otomatik zoom yapar
+                    map_width = 820
+                    map_height = 570
+
                     static_map_url = (
                         f"https://maps.googleapis.com/maps/api/staticmap?"
                         f"size={map_width}x{map_height}&"
@@ -193,13 +192,18 @@ class DataFetchWorker(QThread):
                         f"markers=color:blue|size:mid|label:B|{start_lat},{start_lon}&"
                         f"markers=color:red|size:mid|label:E|{end_lat},{end_lon}&"
                         f"path=color:0x007AFF|weight:5|enc:{polyline}&"
+                        f"scale=2&"
                         f"key={api_key}"
                     )
                     
                     map_response = requests.get(static_map_url, timeout=15)
                     
                     if map_response.status_code == 200:
-                        # Harita + mesafe/süre bilgisini gönder
+                        pixmap = QPixmap()
+                        ok = pixmap.loadFromData(map_response.content)
+                        if not ok:
+                            self.error_occurred.emit("Harita görseli çözümlenemedi")
+                            return
                         result = {
                             'map_data': map_response.content,
                             'distance': distance,
@@ -243,6 +247,8 @@ class RoundedCoverMapLabel(QLabel):
         super().__init__(*args, **kwargs)
         self._map_pixmap = None
         self._corner_radius = corner_radius
+        self._rota_text = None
+        self._info_text = None
 
     def set_map_pixmap(self, pixmap):
         self._map_pixmap = pixmap
@@ -252,10 +258,18 @@ class RoundedCoverMapLabel(QLabel):
         self._map_pixmap = None
         self.update()
 
+    def set_overlay_text(self, rota_text, info_text):
+        self._rota_text = rota_text
+        self._info_text = info_text
+        self.update()
+
     def paintEvent(self, event):
         if not self._map_pixmap or self._map_pixmap.isNull():
             super().paintEvent(event)
             return
+
+        from PyQt5.QtGui import QLinearGradient
+        from PyQt5.QtCore import QRect
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
@@ -272,6 +286,29 @@ class RoundedCoverMapLabel(QLabel):
         y = (scaled.height() - self.height()) // 2
         painter.drawPixmap(-x, -y, scaled)
 
+        gradient_height = 60
+        gradient = QLinearGradient(0, self.height() - gradient_height, 0, self.height())
+        gradient.setColorAt(0, QColor(0, 0, 0, 0))
+        gradient.setColorAt(0.5, QColor(0, 0, 0, 180))
+        gradient.setColorAt(1, QColor(0, 0, 0, 240))
+        painter.fillRect(0, self.height() - gradient_height, self.width(), gradient_height, gradient)
+
+        if hasattr(self, '_rota_text') and self._rota_text:
+            painter.setPen(QColor(255, 255, 255, 100))
+            painter.setFont(QFont('Geist', 8))
+            painter.drawText(20, self.height() - 38, "ROTA")
+
+            painter.setPen(QColor(255, 255, 255, 220))
+            painter.setFont(QFont('Geist', 13))
+            painter.drawText(20, self.height() - 16, self._rota_text)
+
+        if hasattr(self, '_info_text') and self._info_text:
+            painter.setPen(QColor(255, 255, 255, 180))
+            painter.setFont(QFont('Geist', 11))
+            metrics = painter.fontMetrics()
+            text_width = metrics.horizontalAdvance(self._info_text)
+            painter.drawText(self.width() - text_width - 20, self.height() - 16, self._info_text)
+
 
 # ============================================================================
 # 🏥 ANA UYGULAMA
@@ -279,25 +316,22 @@ class RoundedCoverMapLabel(QLabel):
 class ModernCorporateEczaneApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("KARŞIYAKA 4 Nöbetçi Eczane")
+        self.setWindowTitle(f"{Config.TARGET_REGION} Nöbetçi Eczane")
         
-        # DİKEY MONİTÖR İÇİN BOYUTLAR
-        self.setFixedSize(900, 1280)
+        self.setFixedSize(Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT)
         
         # 🌐 LOCAL HTTP SERVER BAŞLAT
         self.start_local_server()
         
-        # API anahtarları - sadece environment/config üzerinden al
-        self.api_key = os.environ.get('GOOGLE_MAPS_KEY') or os.environ.get('GOOGLE_MAPS_API_KEY')
-        self.weather_api_key = os.environ.get('OPENWEATHER_KEY') or os.environ.get('OPENWEATHER_API_KEY')
+        self.api_key = Config.GOOGLE_MAPS_API_KEY
+        self.weather_api_key = Config.OPENWEATHER_API_KEY
         if not self.api_key:
             print("Uyari: GOOGLE_MAPS_KEY veya GOOGLE_MAPS_API_KEY tanimli degil.")
         if not self.weather_api_key:
             print("Uyari: OPENWEATHER_KEY veya OPENWEATHER_API_KEY tanimli degil.")
-        
-        # Başlangıç koordinatları (Eczanenin konumu)
-        self.start_lat = 38.47434762293852
-        self.start_lon = 27.112356625119595
+
+        self.start_lat = Config.START_LAT
+        self.start_lon = Config.START_LON
         
         # Eczane koordinatları (güncellenecek)
         self.end_lat = None
@@ -305,6 +339,11 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         self.current_mode = None
         self.video_path = None
+        self.video_files = []
+        self.image_files = []
+        self.current_slide_index = 0
+        self.current_video_index = 0
+        self.slide_timer = None
         self.card_row_horizontal_margin = 32
         
         # Worker thread referansları
@@ -547,7 +586,6 @@ class ModernCorporateEczaneApp(QMainWindow):
         layout.setContentsMargins(40, 32, 40, 32)
         
         self.setup_lottie_weather()
-        self.setup_animations()
         self.create_red_header_with_lottie(layout)
         self.create_svg_info_section(layout)
         self.create_corporate_qr_map_section(layout)
@@ -788,68 +826,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         layout.addWidget(info_container)
 
     def get_nobet_saati(self):
-        """Nöbet saatini hesapla - özel günlerde 24 saat, arefelerde 13:00'dan itibaren"""
-        from datetime import datetime
-        
-        now = datetime.now()
-        gun = now.weekday()  # 0=Pazartesi, 6=Pazar
-        ay = now.month
-        gun_sayi = now.day
-        yil = now.year
-        
-        # Pazar günü
-        if gun == 6:
-            return "Nöbet: 24 Saat"
-        
-        # Resmi tatiller (24 saat)
-        resmi_tatiller = [
-            (1, 1),    # Yılbaşı
-            (4, 23),   # 23 Nisan
-            (5, 1),    # 1 Mayıs
-            (5, 19),   # 19 Mayıs
-            (7, 15),   # 15 Temmuz
-            (8, 30),   # 30 Ağustos
-            (10, 29),  # 29 Ekim
-        ]
-        
-        if (ay, gun_sayi) in resmi_tatiller:
-            return "Nöbet: 24 Saat"
-        
-        # Arefe günleri (13:00'dan itibaren)
-        arefe_gunleri = [
-            (10, 28),  # 29 Ekim arefesi
-            (12, 31),  # Yılbaşı arefesi
-        ]
-        
-        # Dini bayram arefeleri 2025
-        dini_arefe = {
-            2025: [(3, 29), (6, 5)],
-            2026: [(3, 19), (5, 26)],
-        }
-
-        if yil in dini_arefe and (ay, gun_sayi) in dini_arefe[yil]:
-            return "Nöbet: 13:00 - 09:00"
-        
-        if (ay, gun_sayi) in arefe_gunleri:
-            return "Nöbet: 13:00 - 09:00"
-        
-        # Dini bayramlar 2025 (24 saat)
-        dini_bayramlar = {
-            2025: [
-                (3, 30), (3, 31), (4, 1),  # Ramazan Bayramı 2025
-                (6, 6), (6, 7), (6, 8), (6, 9),  # Kurban Bayramı 2025
-            ],
-            2026: [
-                (3, 20), (3, 21), (3, 22),  # Ramazan Bayramı 2026
-                (5, 27), (5, 28), (5, 29), (5, 30),  # Kurban Bayramı 2026
-            ]
-        }
-        
-        if yil in dini_bayramlar and (ay, gun_sayi) in dini_bayramlar[yil]:
-            return "Nöbet: 24 Saat"
-
-        # Normal gün
-        return "Nöbet: 19:00 - 09:00"
+        return Config.get_nobet_saati_str()
 
     def create_svg_info_display(self, name, phone, address, distancex):
         """📱 BİLGİ DISPLAY"""
@@ -880,8 +857,9 @@ class ModernCorporateEczaneApp(QMainWindow):
         # MESAFE
         distance_row = self.create_info_row("icons/navigation.svg", "🚗", "Mesafe: Hesaplanıyor...", self.colors['accent_green'])
         self.info_widget_layout.addWidget(distance_row)
+        self._distance_row_label = distance_row.findChild(QLabel)
         # NÖBET SAATLERİ
-        time_row = self.create_info_row("icons/time.svg", "⏱️", "Nöbet: 19:00 - 09:00", self.colors['accent_purple'])
+        time_row = self.create_info_row("icons/time.svg", "⏱️", Config.get_nobet_saati_str(), self.colors['accent_purple'])
         self.info_widget_layout.addWidget(time_row)
 
     def create_info_row(self, svg_path, fallback_emoji, text, color, wrap=False):
@@ -929,9 +907,10 @@ class ModernCorporateEczaneApp(QMainWindow):
             color: {self.colors['text_muted']};
             font-size: 16px;
         """)
+
         map_row_layout.addWidget(self.map_label)
         layout.addWidget(map_row)
-    
+
         # destination_label hala lazım (on_map_data_ready'de kullanılıyor)
         self.destination_label = QLabel("Nöbetçi Eczane")
         self.destination_label.hide()  # Gizli, sadece veri tutmak için
@@ -991,12 +970,12 @@ class ModernCorporateEczaneApp(QMainWindow):
         widget = self.video_widget
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(0, 0, 0, 0)
-        
+
         widget.setStyleSheet(f"background-color: {self.colors['bg_primary']};")
-        
+
         self.video_widget_display = QVideoWidget()
         layout.addWidget(self.video_widget_display)
-        
+
         self.no_video_label = QLabel()
         self.no_video_label.setAlignment(Qt.AlignCenter)
         self.no_video_label.setFont(QFont('Geist', 28, QFont.Normal))
@@ -1008,20 +987,29 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.update_video_message()
         layout.addWidget(self.no_video_label)
 
+        # Overlay label for image slideshow — covers the full video widget
+        self.slide_label = QLabel(widget)
+        self.slide_label.setGeometry(0, 0, Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT)
+        self.slide_label.setAlignment(Qt.AlignCenter)
+        self.slide_label.setStyleSheet("background-color: #000000;")
+        self.slide_label.hide()
+
     def update_video_message(self):
         """Video mesajını güncelle"""
-        if not self.video_path:
+        if not self.video_path and not getattr(self, 'image_files', []):
             message = """📺 REKLAM MODU
 
-ads/ klasöründe video dosyası bulunamadı.
+ads/ klasöründe dosya bulunamadı.
 
 Desteklenen formatlar:
 • MP4 (.mp4)
-• MOV (.mov) 
-• AVI (.avi)"""
+• MOV (.mov)
+• AVI (.avi)
+• PNG (.png)
+• JPG (.jpg)"""
         else:
-            message = "🎬 Video yükleniyor..."
-            
+            message = "🎬 Yükleniyor..."
+
         self.no_video_label.setText(message)
 
     def setup_video_player(self):
@@ -1029,28 +1017,102 @@ Desteklenen formatlar:
         self.media_player = QMediaPlayer(None, QMediaPlayer.VideoSurface)
         self.media_player.setVideoOutput(self.video_widget_display)
         self.media_player.mediaStatusChanged.connect(self.on_media_status_changed)
-        self.check_video_file()
+        self.check_ad_files()
 
-    def check_video_file(self):
-        """Video dosyası kontrol"""
+    def check_ad_files(self):
+        """ads/ klasöründeki video ve görsel dosyalarını tara"""
         ads_dir = "ads"
-        if not os.path.exists(ads_dir):
-            self.video_path = None
-            return
-        
-        for file in os.listdir(ads_dir):
-            if file.lower().endswith(('.mp4', '.mov', '.avi')):
-                self.video_path = os.path.join(ads_dir, file)
-                print(f"✅ Video bulundu: {self.video_path}")
-                return
-        
+        self.video_files = []
+        self.image_files = []
         self.video_path = None
+
+        if not os.path.exists(ads_dir):
+            return
+
+        try:
+            for file in sorted(os.listdir(ads_dir)):
+                path = os.path.join(ads_dir, file)
+                lower = file.lower()
+                if lower.endswith(('.mp4', '.mov', '.avi')):
+                    self.video_files.append(path)
+                elif lower.endswith(('.png', '.jpg', '.jpeg')):
+                    self.image_files.append(path)
+        except OSError:
+            return
+
+        if self.video_files:
+            self.video_path = self.video_files[0]
+            print(f"✅ {len(self.video_files)} video bulundu")
+        if self.image_files:
+            print(f"✅ {len(self.image_files)} görsel bulundu")
 
     def on_media_status_changed(self, status):
         """Video status değişimi"""
         if status == QMediaPlayer.EndOfMedia:
-            self.media_player.setPosition(0)
+            self.current_video_index += 1
+            if self.current_video_index < len(self.video_files):
+                self._play_current_video()
+            elif self.image_files:
+                # Tüm videolar bitti, slayta dön
+                self.current_slide_index = 0
+                self.show_next_slide()
+            else:
+                # Sadece video var, başa dön
+                self.current_video_index = 0
+                self._play_current_video()
+
+    def show_next_slide(self):
+        """Slayt gösterisi: mevcut görseli göster, 15 sn sonra bir sonrakine geç"""
+        if self.current_mode != 'video' or not self.image_files:
+            return
+
+        idx = self.current_slide_index % len(self.image_files)
+        path = self.image_files[idx]
+
+        pixmap = QPixmap(path)
+        if not pixmap.isNull():
+            w, h = Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT
+            scaled = pixmap.scaled(w, h, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            x = (scaled.width() - w) // 2
+            y = (scaled.height() - h) // 2
+            self.slide_label.setPixmap(scaled.copy(x, y, w, h))
+
+        self.slide_label.show()
+        self.slide_label.raise_()
+        self.video_widget_display.hide()
+        self.no_video_label.hide()
+
+        self.current_slide_index += 1
+
+        if self.slide_timer is not None:
+            self.slide_timer.stop()
+
+        self.slide_timer = QTimer()
+        self.slide_timer.setSingleShot(True)
+
+        self.slide_timer.timeout.connect(self.show_next_slide)
+
+        self.slide_timer.start(15000)
+
+    def _start_video_playlist(self):
+        """Tüm görseller gösterildikten sonra video listesini başlat"""
+        if self.current_mode != 'video' or not self.video_files:
+            return
+        self.current_video_index = 0
+        self._play_current_video()
+
+    def _play_current_video(self):
+        """video_files listesindeki mevcut videoyu oynat"""
+        if self.current_mode != 'video' or not self.video_files:
+            return
+        path = self.video_files[self.current_video_index % len(self.video_files)]
+        if os.path.exists(path):
+            self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(os.path.abspath(path))))
             self.media_player.play()
+            self.slide_label.hide()
+            self.no_video_label.hide()
+            self.video_widget_display.show()
+            print(f"▶️ Video oynatılıyor: {path}")
 
     def setup_timers(self):
         """Timer kurulum"""
@@ -1062,122 +1124,47 @@ Desteklenen formatlar:
         # Mod kontrolü - dakikada bir
         self.schedule_timer = QTimer()
         self.schedule_timer.timeout.connect(self.check_schedule_and_switch)
-        self.schedule_timer.start(60000)  # 1 dakika
+        self.schedule_timer.start(Config.MODE_CHECK_INTERVAL)
         
         print("⏰ Nöbet saatleri: Hafta içi 18:45-08:45, Cumartesi 16:00-08:45, Pazar tüm gün")
 
-    def setup_animations(self):
-        """Animasyon kurulum"""
-        self.pulse_timer = QTimer()
-        self.pulse_timer.timeout.connect(self.pulse_animation)
-        self.pulse_timer.start(1000)
-        self.pulse_state = True
-
-    def pulse_animation(self):
-        """Pulse efekt"""
-        if hasattr(self, 'status_label'):
-            if self.pulse_state:
-                self.status_label.setStyleSheet(f"""
-                    color: {self.colors['accent_green']};
-                    background: rgba(48, 209, 88, 0.2);
-                    border-radius: 8px;
-                    padding: 4px 8px;
-                """)
-            else:
-                self.status_label.setStyleSheet(f"""
-                    color: {self.colors['accent_green']};
-                    background: transparent;
-                """)
-            self.pulse_state = not self.pulse_state
-
     def check_schedule_and_switch(self):
-        """🕐 NÖBET SAATLERİ KONTROLÜ"""
-        now = datetime.now()
-        current_time = now.time()
-        current_day = now.weekday()  # 0=Pazartesi, 6=Pazar
-        ay = now.month
-        gun_sayi = now.day
-        yil = now.year
-        
-        # Saatleri tanımla
-        time_0900 = datetime.strptime("09:00", "%H:%M").time()
-        time_1300 = datetime.strptime("13:00", "%H:%M").time()
-        time_1900 = datetime.strptime("19:00", "%H:%M").time()
-        
-        should_show_pharmacy = False
-        
-        # Resmi tatiller (24 saat)
-        resmi_tatiller = [
-            (1, 1), (4, 23), (5, 1), (5, 19),
-            (7, 15), (8, 30), (10, 29),
-        ]
-        
-        # Dini bayramlar
-        dini_bayramlar = {
-            2025: [(3, 30), (3, 31), (4, 1), (6, 6), (6, 7), (6, 8), (6, 9)],
-            2026: [(3, 20), (3, 21), (3, 22), (5, 27), (5, 28), (5, 29), (5, 30)],
-        }
-        
-        # Arefe günleri
-        arefe_gunleri = [(10, 28), (12, 31)]
-        dini_arefe = {
-            2025: [(3, 29), (6, 5)],
-            2026: [(3, 19), (5, 26)],
-        }
-        
-        # PAZAR veya RESMİ TATİL veya DİNİ BAYRAM → 24 SAAT
-        if current_day == 6:
-            should_show_pharmacy = True
-        elif (ay, gun_sayi) in resmi_tatiller:
-            should_show_pharmacy = True
-        elif yil in dini_bayramlar and (ay, gun_sayi) in dini_bayramlar[yil]:
-            should_show_pharmacy = True
-        
-        # AREFE GÜNLERİ → 13:00'dan itibaren
-        elif (ay, gun_sayi) in arefe_gunleri:
-            if current_time >= time_1300 or current_time < time_0900:
-                should_show_pharmacy = True
-        elif yil in dini_arefe and (ay, gun_sayi) in dini_arefe[yil]:
-            if current_time >= time_1300 or current_time < time_0900:
-                should_show_pharmacy = True
-        
-        # NORMAL GÜNLER → 19:00 - 09:00
+        if Config.is_ad_mode():
+            if self.current_mode != 'video':
+                self.switch_to_video_mode()
         else:
-            if current_time >= time_1900 or current_time < time_0900:
-                should_show_pharmacy = True
-        
-        # Mod değişimi
-        if should_show_pharmacy and self.current_mode != "pharmacy":
-            day_names = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
-            print(f"🏥 NÖBET MODUNA GEÇİYOR - {day_names[current_day]} {now.strftime('%H:%M')}")
-            self.switch_to_pharmacy_mode()
-            
-        elif not should_show_pharmacy and self.current_mode != "video":
-            day_names = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
-            print(f"🎬 REKLAM MODUNA GEÇİYOR - {day_names[current_day]} {now.strftime('%H:%M')}")
-            self.switch_to_video_mode()
+            if self.current_mode != 'pharmacy':
+                self.switch_to_pharmacy_mode()
 
     def switch_to_video_mode(self):
-        """Video moduna geç"""
+        """Video/slayt moduna geç"""
         self.current_mode = "video"
         self.stacked_widget.setCurrentWidget(self.video_widget)
-        
-        if self.video_path and os.path.exists(self.video_path):
-            self.media_player.setMedia(QMediaContent(QUrl.fromLocalFile(os.path.abspath(self.video_path))))
-            self.media_player.play()
-            self.no_video_label.hide()
-            self.video_widget_display.show()
-            print(f"▶️ Video oynatılıyor: {self.video_path}")
+
+        if self.image_files:
+            self.current_slide_index = 0
+            self.show_next_slide()
+            print(f"🖼️ Slayt gösterisi başlatıldı: {len(self.image_files)} görsel")
+        elif self.video_files:
+            self.current_video_index = 0
+            self._play_current_video()
         else:
+            self.slide_label.hide()
             self.video_widget_display.hide()
             self.no_video_label.show()
-            print("❌ Video bulunamadı")
+            print("❌ Reklam dosyası bulunamadı")
 
     def switch_to_pharmacy_mode(self):
         """Eczane moduna geç"""
         self.current_mode = "pharmacy"
+
+        if self.slide_timer is not None:
+            self.slide_timer.stop()
+            self.slide_timer = None
+
         if hasattr(self, 'media_player') and self.media_player.state() == QMediaPlayer.PlayingState:
             self.media_player.stop()
+
         self.stacked_widget.setCurrentWidget(self.pharmacy_widget)
         self.fetch_data()
         self.fetch_weather_data()
@@ -1258,48 +1245,12 @@ Desteklenen formatlar:
             if map_bytes:
                 pixmap = QPixmap()
                 pixmap.loadFromData(map_bytes)
-                styled_pixmap = pixmap.copy()
-                
-                # Overlay'i pixmap üzerine çiz
-                from PyQt5.QtGui import QPainter, QLinearGradient, QPen
-                
-                painter = QPainter(styled_pixmap)
-                painter.setRenderHint(QPainter.Antialiasing)
-                
-                # Gradient overlay
-                gradient = QLinearGradient(0, styled_pixmap.height() - 60, 0, styled_pixmap.height())
-                gradient.setColorAt(0, QColor(0, 0, 0, 0))
-                gradient.setColorAt(0.5, QColor(0, 0, 0, 180))
-                gradient.setColorAt(1, QColor(0, 0, 0, 240))
-                
-                painter.fillRect(0, styled_pixmap.height() - 60, styled_pixmap.width(), 60, gradient)
-                
-                # Yazıları çiz
-                painter.setPen(QColor(255, 255, 255, 100))
-                painter.setFont(QFont('Geist', 8))
-                painter.drawText(50, styled_pixmap.height() - 38, "ROTA")
-                
-                painter.setPen(QColor(255, 255, 255, 150))
-                painter.setFont(QFont('Geist', 11))
-                painter.drawText(50, styled_pixmap.height() - 18, f"Eczaneniz -> {self.destination_label.text()}")
-                
-                # İkon kutusu
-                painter.setPen(QPen(QColor(255, 255, 255, 80), 1))
-                painter.drawRoundedRect(10, styled_pixmap.height() - 48, 32, 32, 4, 4)
-                
-                painter.setPen(QColor(255, 255, 255, 255))
-                painter.setFont(QFont('Geist', 14))
-                painter.drawText(18, styled_pixmap.height() - 24, "->")
-                
-                painter.end()
-
                 distance = data.get('distance', '~2 km')
                 duration = data.get('duration', '~5 dakika')
 
-                # Mesafe güncelle
                 self.update_distance_duration(distance, duration)
                 self.map_label.setText("")
-                self.map_label.set_map_pixmap(styled_pixmap)
+                self.map_label.set_map_pixmap(pixmap)
             
         except Exception as e:
             print(f"❌ Harita gösterme hatası: {e}")
@@ -1307,17 +1258,15 @@ Desteklenen formatlar:
             self.map_label.setText("❌ Harita yüklenemedi")
 
     def update_distance_duration(self, distance, duration):
-        """Mesafe bilgisini güncelle"""
-        for i in range(self.info_widget_layout.count()):
-            widget = self.info_widget_layout.itemAt(i).widget()
-            if widget and widget.layout():
-                for j in range(widget.layout().count()):
-                    item = widget.layout().itemAt(j)
-                    if item and item.widget() and isinstance(item.widget(), QLabel):
-                        text = item.widget().text()
-                        if "Mesafe:" in text or "Hesaplanıyor" in text:
-                            item.widget().setText(f"Mesafe: {distance}")
-                            return
+        self.last_distance = distance
+        self.last_duration = duration
+        if hasattr(self, '_distance_row_label') and self._distance_row_label:
+            self._distance_row_label.setText(f"Mesafe: {distance}  ({duration})")
+        pharmacy_name = self.destination_label.text() if hasattr(self, 'destination_label') else "Nöbetçi Eczane"
+        self.map_label.set_overlay_text(
+            f"Eczaneniz  →  {pharmacy_name}",
+            f"{distance}  •  {duration}"
+        )
 
     def on_map_error(self, error_msg):
         """Harita hatası"""
@@ -1402,7 +1351,8 @@ Desteklenen formatlar:
         self.info_widget_layout.addWidget(error_label)
         
         now = datetime.now()
-        self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')} (Bulunamadı)")
+        if hasattr(self, 'last_update_label') and self.last_update_label:
+            self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')} (Bulunamadı)")
 
     def show_error_state(self, error_msg):
         """Hata durumu"""
@@ -1419,7 +1369,8 @@ Desteklenen formatlar:
         self.info_widget_layout.addWidget(error_label)
         
         now = datetime.now()
-        self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')} (Hata)")
+        if hasattr(self, 'last_update_label') and self.last_update_label:
+            self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')} (Hata)")
 
     def format_phone_number(self, phone):
         """📞 Telefon formatla: 0232 999 99 99"""
@@ -1522,36 +1473,11 @@ Desteklenen formatlar:
 # ============================================================================
 # 🚀 MAIN
 # ============================================================================
-if __name__ == "__main__":
-    print("=" * 70)
-    print("🏥 KARŞIYAKA 4 NÖBETÇİ ECZANE SİSTEMİ")
-    print("=" * 70)
-    
+def main():
     app = QApplication(sys.argv)
-    font = QFont("Geist", 12)
-    app.setFont(font)
-    
-    try:
-        window = ModernCorporateEczaneApp()
-        
-        print("\n📊 Sistem Durumu:")
-        print("   ✅ Worker Thread - UI donması önlendi")
-        print("   ✅ Cumartesi 16:00 nöbet desteği")
-        print("   ✅ HTTP Server + Lottie")
-        print("   ✅ SVG ikonlar + QR kod + Harita")
-        print("\n⌨️  Kısayollar:")
-        print("   ESC  : Çıkış")
-        print("   F11  : Tam ekran")
-        print("   R    : Manuel yenileme")
-        print("\n🕐 Nöbet Saatleri:")
-        print("   Pazartesi-Cuma : 18:45 - 08:45")
-        print("   Cumartesi      : 16:00 - 08:45")
-        print("   Pazar          : Tüm gün")
-        print("=" * 70)
-        
-        sys.exit(app.exec_())
-        
-    except Exception as e:
-        print(f"❌ Hata: {e}")
-        import traceback
-        traceback.print_exc()
+    window = ModernCorporateEczaneApp()
+    sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    main()
