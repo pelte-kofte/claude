@@ -20,7 +20,7 @@ from PyQt5.QtMultimediaWidgets import *
 from PyQt5.QtSvg import QSvgWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 import threading
-from config import Config, Colors, Fonts
+from config import Config
 
 
 # ============================================================================
@@ -164,54 +164,62 @@ class DataFetchWorker(QThread):
             )
             
             directions_response = requests.get(directions_url, timeout=15)
-            
-            if directions_response.status_code == 200:
-                directions_data = directions_response.json()
-                
-                if directions_data['status'] == 'OK':
-                    route = directions_data['routes'][0]
-                    polyline = route['overview_polyline']['points']
-                    
-                    # Mesafe ve süre
-                    leg = route['legs'][0]
-                    distance = leg['distance']['text']
-                    duration = leg['duration']['text']
-                    
-                    # Türkçeleştir
-                    duration = duration.replace('mins', 'dakika').replace('min', 'dakika')
-                    duration = duration.replace('hours', 'saat').replace('hour', 'saat')
-                    
-                    map_width = 820
-                    map_height = 570
+            directions_response.raise_for_status()
+            directions_data = directions_response.json()
 
-                    static_map_url = (
-                        f"https://maps.googleapis.com/maps/api/staticmap?"
-                        f"size={map_width}x{map_height}&"
-                        f"maptype=roadmap&"
-                        f"visible={start_lat},{start_lon}|{end_lat},{end_lon}&"
-                        f"markers=color:blue|size:mid|label:B|{start_lat},{start_lon}&"
-                        f"markers=color:red|size:mid|label:E|{end_lat},{end_lon}&"
-                        f"path=color:0x007AFF|weight:5|enc:{polyline}&"
-                        f"scale=2&"
-                        f"key={api_key}"
-                    )
-                    
-                    map_response = requests.get(static_map_url, timeout=15)
-                    
-                    if map_response.status_code == 200:
-                        pixmap = QPixmap()
-                        ok = pixmap.loadFromData(map_response.content)
-                        if not ok:
-                            self.error_occurred.emit("Harita görseli çözümlenemedi")
-                            return
-                        result = {
-                            'map_data': map_response.content,
-                            'distance': distance,
-                            'duration': duration
-                        }
-                        self.map_data_ready.emit(result)
-                        return
-            
+            if directions_data['status'] == 'OK':
+                route = directions_data['routes'][0]
+                polyline = route['overview_polyline']['points']
+
+                # Mesafe ve süre
+                leg = route['legs'][0]
+                distance = leg['distance']['text']
+                duration = leg['duration']['text']
+
+                # Türkçeleştir
+                duration = duration.replace('mins', 'dakika').replace('min', 'dakika')
+                duration = duration.replace('hours', 'saat').replace('hour', 'saat')
+
+                map_width = Config.MAP_WIDTH
+                map_height = Config.MAP_HEIGHT
+
+                lat_diff = abs(end_lat - start_lat)
+                lon_diff = abs(end_lon - start_lon)
+                padding_factor = 0.25
+                lat_pad = max(lat_diff * padding_factor, 0.002)
+                lon_pad = max(lon_diff * padding_factor, 0.002)
+
+                min_lat = min(start_lat, end_lat) - lat_pad
+                max_lat = max(start_lat, end_lat) + lat_pad
+                min_lon = min(start_lon, end_lon) - lon_pad
+                max_lon = max(start_lon, end_lon) + lon_pad
+
+                static_map_url = (
+                    f"https://maps.googleapis.com/maps/api/staticmap?"
+                    f"size={map_width}x{map_height}&"
+                    f"maptype=roadmap&"
+                    f"visible={min_lat},{min_lon}|{max_lat},{max_lon}&"
+                    f"markers=color:blue|size:mid|label:B|{start_lat},{start_lon}&"
+                    f"markers=color:red|size:mid|label:E|{end_lat},{end_lon}&"
+                    f"path=color:0x007AFF|weight:5|enc:{polyline}&"
+                    f"scale=2&"
+                    f"key={api_key}"
+                )
+
+                map_response = requests.get(static_map_url, timeout=15)
+                map_response.raise_for_status()
+                ct = map_response.headers.get("Content-Type", "")
+                if not ct.startswith("image/"):
+                    self.error_occurred.emit("Harita görseli çözümlenemedi")
+                    return
+                result = {
+                    'map_data': map_response.content,
+                    'distance': distance,
+                    'duration': duration
+                }
+                self.map_data_ready.emit(result)
+                return
+
             self.error_occurred.emit("Harita oluşturulamadı")
             
         except Exception as e:
@@ -387,10 +395,6 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         def run_server():
             try:
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                os.chdir(current_dir)
-                print(f"📁 Server dizini: {current_dir}")
-                
                 handler = CORSHTTPRequestHandler
                 
                 for port in range(8000, 8010):
@@ -807,7 +811,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         self.qr_label = QLabel("QR\nYükleniyor...")
         self.qr_label.setAlignment(Qt.AlignCenter)
-        self.qr_label.setFixedSize(160, 160)
+        self.qr_label.setFixedSize(Config.QR_SIZE, Config.QR_SIZE)
         self.qr_label.setStyleSheet(f"""
             background-color: {self.colors['text_primary']};
             border-radius: 12px;
@@ -828,7 +832,7 @@ class ModernCorporateEczaneApp(QMainWindow):
     def get_nobet_saati(self):
         return Config.get_nobet_saati_str()
 
-    def create_svg_info_display(self, name, phone, address, distancex):
+    def create_svg_info_display(self, name, phone, address):
         """📱 BİLGİ DISPLAY"""
         # Mevcut widget'ları temizle
         for i in reversed(range(self.info_widget_layout.count())): 
@@ -847,19 +851,19 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.info_widget_layout.addWidget(name_label)
         
         # TELEFON
-        phone_row = self.create_info_row("icons/phone.svg", "📞", phone, self.colors['accent_blue'])
+        phone_row, _ = self.create_info_row("icons/phone.svg", "📞", phone, self.colors['accent_blue'])
         self.info_widget_layout.addWidget(phone_row)
-        
+
         # ADRES
-        address_row = self.create_info_row("icons/mappin.svg", "📍", address, self.colors['accent_red'], wrap=True)
+        address_row, _ = self.create_info_row("icons/mappin.svg", "📍", address, self.colors['accent_red'], wrap=True)
         self.info_widget_layout.addWidget(address_row)
-        
+
         # MESAFE
-        distance_row = self.create_info_row("icons/navigation.svg", "🚗", "Mesafe: Hesaplanıyor...", self.colors['accent_green'])
+        distance_row, self._distance_row_label = self.create_info_row("icons/navigation.svg", "🚗", "Mesafe: Hesaplanıyor...", self.colors['accent_green'])
         self.info_widget_layout.addWidget(distance_row)
-        self._distance_row_label = distance_row.findChild(QLabel)
+
         # NÖBET SAATLERİ
-        time_row = self.create_info_row("icons/time.svg", "⏱️", Config.get_nobet_saati_str(), self.colors['accent_purple'])
+        time_row, _ = self.create_info_row("icons/time.svg", "⏱️", Config.get_nobet_saati_str(), self.colors['accent_purple'])
         self.info_widget_layout.addWidget(time_row)
 
     def create_info_row(self, svg_path, fallback_emoji, text, color, wrap=False):
@@ -888,8 +892,8 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         if not wrap:
             row_layout.addStretch()
-        
-        return row
+
+        return row, label
 
     def create_corporate_qr_map_section(self, layout):
         """🗺️ HARİTA SECTION"""
@@ -900,7 +904,7 @@ class ModernCorporateEczaneApp(QMainWindow):
 
         self.map_label = RoundedCoverMapLabel("Harita yukleniyor...")
         self.map_label.setAlignment(Qt.AlignCenter)
-        self.map_label.setFixedHeight(570)
+        self.map_label.setFixedHeight(Config.MAP_HEIGHT)
         self.map_label.setStyleSheet(f"""
             background-color: {self.colors['bg_secondary']};
             border-radius: 12px;
@@ -1048,7 +1052,7 @@ Desteklenen formatlar:
 
     def on_media_status_changed(self, status):
         """Video status değişimi"""
-        if status == QMediaPlayer.EndOfMedia:
+        if status in (QMediaPlayer.EndOfMedia, QMediaPlayer.InvalidMedia):
             self.current_video_index += 1
             if self.current_video_index < len(self.video_files):
                 self._play_current_video()
@@ -1076,6 +1080,12 @@ Desteklenen formatlar:
             x = (scaled.width() - w) // 2
             y = (scaled.height() - h) // 2
             self.slide_label.setPixmap(scaled.copy(x, y, w, h))
+            self.slide_label.setText("")
+            self.slide_label.setStyleSheet("background-color: #000000;")
+        else:
+            self.slide_label.setPixmap(QPixmap())
+            self.slide_label.setText("⚠ Görsel yüklenemedi")
+            self.slide_label.setStyleSheet("background-color: #000000; color: #ffffff; font-size: 18px;")
 
         self.slide_label.show()
         self.slide_label.raise_()
@@ -1083,16 +1093,18 @@ Desteklenen formatlar:
         self.no_video_label.hide()
 
         self.current_slide_index += 1
+        if self.current_slide_index >= len(self.image_files) and self.video_files:
+            self.slide_timer = None
+            self._start_video_playlist()
+            return
 
         if self.slide_timer is not None:
             self.slide_timer.stop()
 
         self.slide_timer = QTimer()
         self.slide_timer.setSingleShot(True)
-
         self.slide_timer.timeout.connect(self.show_next_slide)
-
-        self.slide_timer.start(15000)
+        self.slide_timer.start(Config.SLIDE_DURATION)
 
     def _start_video_playlist(self):
         """Tüm görseller gösterildikten sonra video listesini başlat"""
@@ -1116,17 +1128,22 @@ Desteklenen formatlar:
 
     def setup_timers(self):
         """Timer kurulum"""
-        # Veri güncelleme - 30 dakikada bir
+        # Veri güncelleme
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.fetch_data)
-        self.update_timer.start(1800000)  # 30 dakika
+        self.update_timer.start(Config.PHARMACY_UPDATE_INTERVAL)
 
-        # Mod kontrolü - dakikada bir
+        # Hava durumu güncelleme
+        self.weather_timer = QTimer()
+        self.weather_timer.timeout.connect(self.fetch_weather_data)
+        self.weather_timer.start(Config.WEATHER_UPDATE_INTERVAL)
+
+        # Mod kontrolü
         self.schedule_timer = QTimer()
         self.schedule_timer.timeout.connect(self.check_schedule_and_switch)
         self.schedule_timer.start(Config.MODE_CHECK_INTERVAL)
-        
-        print("⏰ Nöbet saatleri: Hafta içi 18:45-08:45, Cumartesi 16:00-08:45, Pazar tüm gün")
+
+        print("⏰ Nöbet saatleri: Hafta içi 18:45-08:45, Cumartesi 16:00-08:55, Pazar tüm gün")
 
     def check_schedule_and_switch(self):
         if Config.is_ad_mode():
@@ -1201,26 +1218,22 @@ Desteklenen formatlar:
             self.end_lat = data['end_lat']
             self.end_lon = data['end_lon']   
             # Önce mesafe/süre olmadan göster
-            self.create_svg_info_display(name, phone, address, "Hesaplanıyor...")
-            
+            self.create_svg_info_display(name, phone, address)
+
             # QR kod oluştur
             if maps_url:
                 self.create_qr_code(maps_url)
-            
+
             # Harita için worker başlat
-            self.fetch_map_data()   
-            
-            # Son güncelleme
-            now = datetime.now()
-            # self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')}")
-            
+            self.fetch_map_data()
+
             print(f"✅ Eczane bulundu: {name}")
         else:
             self.show_not_found_state()
 
     def fetch_map_data(self):
         """🗺️ HARİTA VERİSİ ÇEK - WORKER THREAD"""
-        if not self.end_lat or not self.end_lon:
+        if self.end_lat is None or self.end_lon is None:
             return
         
         self.map_label.clear_map_pixmap()
@@ -1244,7 +1257,9 @@ Desteklenen formatlar:
             map_bytes = data.get('map_data')
             if map_bytes:
                 pixmap = QPixmap()
-                pixmap.loadFromData(map_bytes)
+                if not pixmap.loadFromData(map_bytes):
+                    self.map_label.setText("❌ Harita yüklenemedi")
+                    return
                 distance = data.get('distance', '~2 km')
                 duration = data.get('duration', '~5 dakika')
 
@@ -1258,8 +1273,6 @@ Desteklenen formatlar:
             self.map_label.setText("❌ Harita yüklenemedi")
 
     def update_distance_duration(self, distance, duration):
-        self.last_distance = distance
-        self.last_duration = duration
         if hasattr(self, '_distance_row_label') and self._distance_row_label:
             self._distance_row_label.setText(f"Mesafe: {distance}  ({duration})")
         pharmacy_name = self.destination_label.text() if hasattr(self, 'destination_label') else "Nöbetçi Eczane"
@@ -1349,10 +1362,6 @@ Desteklenen formatlar:
         error_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
         error_label.setAlignment(Qt.AlignCenter)
         self.info_widget_layout.addWidget(error_label)
-        
-        now = datetime.now()
-        if hasattr(self, 'last_update_label') and self.last_update_label:
-            self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')} (Bulunamadı)")
 
     def show_error_state(self, error_msg):
         """Hata durumu"""
@@ -1367,10 +1376,6 @@ Desteklenen formatlar:
         error_label.setAlignment(Qt.AlignCenter)
         error_label.setWordWrap(True)
         self.info_widget_layout.addWidget(error_label)
-        
-        now = datetime.now()
-        if hasattr(self, 'last_update_label') and self.last_update_label:
-            self.last_update_label.setText(f"Son güncelleme: {now.strftime('%H:%M')} (Hata)")
 
     def format_phone_number(self, phone):
         """📞 Telefon formatla: 0232 999 99 99"""
@@ -1422,8 +1427,7 @@ Desteklenen formatlar:
             pixmap = QPixmap()
             pixmap.loadFromData(buffer.getvalue())
             
-            scaled_pixmap = pixmap.scaled(160, 160, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            from PyQt5.QtGui import QPainterPath
+            scaled_pixmap = pixmap.scaled(Config.QR_SIZE, Config.QR_SIZE, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
             rounded_pixmap = QPixmap(scaled_pixmap.size())
             rounded_pixmap.fill(Qt.transparent)
@@ -1474,6 +1478,7 @@ Desteklenen formatlar:
 # 🚀 MAIN
 # ============================================================================
 def main():
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     app = QApplication(sys.argv)
     window = ModernCorporateEczaneApp()
     sys.exit(app.exec_())

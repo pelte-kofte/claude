@@ -21,10 +21,6 @@ class Config:
     DEFAULT_END_LAT = 38.473137
     DEFAULT_END_LON = 27.113438
 
-    # Raspberry Pi ekran ayarları
-    FULLSCREEN = True
-    HIDE_CURSOR = True
-
     # Mod geçiş saatleri
     AD_WEEKDAY_START = QTime(8, 45)
     AD_WEEKDAY_END   = QTime(18, 45)
@@ -40,25 +36,13 @@ class Config:
     # Test modu (False yaparak normal çalışma moduna geçer)
     TEST_MODE = False
 
-    # Log ayarları
-    LOG_LEVEL = "INFO"
-    LOG_FILE = "eczane_app.log"
-
-    # Raspberry Pi özel ayarları
-    RASPBERRY_PI_MODE = True
-    AUTO_START_DELAY = 5  # Sistem başladıktan sonra 5 saniye bekle
-
-    # Koordinat bilgileri (Karşıyaka merkez noktası)
-    DEFAULT_LAT = 38.4612
-    DEFAULT_LON = 27.1285
-
     # Harita ayarları (dikey ekran için)
     MAP_WIDTH = 850
-    MAP_HEIGHT = 550
-    MAP_ZOOM = 14
+    MAP_HEIGHT = 570
 
-    # QR kod ayarları
+    # QR kod ve slayt ayarları
     QR_SIZE = 160
+    SLIDE_DURATION = 15000
 
     @classmethod
     def is_ad_mode(cls) -> bool:
@@ -115,6 +99,8 @@ class Config:
             return "Nöbet: 24 Saat"
         AREFE = {2025:[(3,29),(6,5)],2026:[(3,19),(5,26)],2027:[(3,9),(5,15)]}
         if (yil in AREFE and (ay, gun_no) in AREFE[yil]) or (ay, gun_no) in [(10,28),(12,31)]:
+            if gun == 5:
+                return "Nöbet: 13:00 - 08:55"
             return "Nöbet: 13:00 - 08:45"
         if gun == 5:
             return "Nöbet: 16:00 - 08:55"
@@ -190,126 +176,3 @@ class Fonts:
     # Sıcaklık
     TEMP_SIZE = 24
     TEMP_WEIGHT = QFont.Medium
-
-class Styles:
-    # Ana pencere stili
-    MAIN_WINDOW = f"""
-        QMainWindow {{
-            background-color: {Colors.PRIMARY_BG};
-            color: {Colors.PRIMARY_TEXT};
-            font-family: {Fonts.FAMILY};
-        }}
-    """
-
-    # Header stili (dikey ekran için)
-    HEADER = f"""
-        QWidget#header {{
-            background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
-                stop: 0 {Colors.SECONDARY_BG}, stop: 1 {Colors.ACCENT_BG});
-            border-bottom: 2px solid {Colors.BORDER_COLOR};
-            min-height: 120px;
-            max-height: 120px;
-        }}
-    """
-
-    # Kart stili (dikey ekran için optimize)
-    CARD = f"""
-        QWidget.card {{
-            background-color: {Colors.CARD_BG};
-            border: 1px solid {Colors.BORDER_COLOR};
-            border-radius: 12px;
-            margin: 8px;
-            padding: 12px;
-        }}
-        QWidget.card:hover {{
-            background-color: {Colors.ACCENT_BG};
-            border: 1px solid {Colors.ACCENT_TEXT};
-        }}
-    """
-
-    # Label stilleri
-    TITLE_LABEL = f"""
-        QLabel {{
-            color: {Colors.PRIMARY_TEXT};
-            font-size: {Fonts.TITLE_SIZE}px;
-            font-weight: bold;
-            padding: 8px;
-        }}
-    """
-
-    SUBTITLE_LABEL = f"""
-        QLabel {{
-            color: {Colors.ACCENT_TEXT};
-            font-size: {Fonts.SUBTITLE_SIZE}px;
-            font-weight: 500;
-            padding: 4px;
-        }}
-    """
-
-    NORMAL_LABEL = f"""
-        QLabel {{
-            color: {Colors.SECONDARY_TEXT};
-            font-size: {Fonts.NORMAL_SIZE}px;
-            padding: 2px;
-            line-height: 1.4;
-        }}
-    """
-
-    # Scrollbar (dikey ekran için ince)
-    SCROLLBAR = f"""
-        QScrollBar:vertical {{
-            background-color: {Colors.SECONDARY_BG};
-            width: 8px;
-            border-radius: 4px;
-        }}
-        QScrollBar::handle:vertical {{
-            background-color: {Colors.ACCENT_TEXT};
-            border-radius: 4px;
-            min-height: 20px;
-        }}
-        QScrollBar::handle:vertical:hover {{
-            background-color: {Colors.PRIMARY_TEXT};
-        }}
-    """
-
-class RaspberryPiConfig:
-    # GPIO pin'leri (eğer LED/buzzer vs eklenirse)
-    STATUS_LED_PIN = 18
-    BUZZER_PIN = 24
-
-    # Ekran ayarları
-    DISPLAY_ROTATION = 0  # 0, 90, 180, 270
-    BRIGHTNESS = 255      # 0-255 arası
-
-    # Güç yönetimi
-    SCREEN_SAVER_TIMEOUT = 0  # 0 = kapalı, dakika cinsinden
-    AUTO_SHUTDOWN_HOUR = None  # None = kapalı, saat cinsinden
-
-    # Ağ ayarları
-    WIFI_CHECK_INTERVAL = 30  # saniye
-    OFFLINE_MODE_TIMEOUT = 300  # 5 dakika offline sonra yerel gösterim
-
-    # Sistem kaynak kullanımı
-    MAX_CPU_USAGE = 80    # %
-    MAX_MEMORY_USAGE = 85 # %
-
-    # Otomatik başlatma
-    SERVICE_NAME = "eczane-nobetci"
-    SERVICE_DESCRIPTION = "Nöbetçi Eczane Gösterge Sistemi"
-
-
-# Raspberry Pi için sistem kontrolü
-def is_raspberry_pi():
-    """Raspberry Pi üzerinde çalışıp çalışmadığını kontrol eder"""
-    try:
-        with open('/proc/cpuinfo', 'r') as f:
-            cpuinfo = f.read()
-        return 'BCM' in cpuinfo or 'Raspberry Pi' in cpuinfo
-    except:
-        return False
-
-
-# Test ortamı kontrolü
-def is_test_environment():
-    """Test ortamında çalışıp çalışmadığını kontrol eder"""
-    return not is_raspberry_pi() or Config.TEST_MODE

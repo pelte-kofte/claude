@@ -35,7 +35,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(Config.WINDOW_WIDTH, 900)
         self.assertEqual(Config.WINDOW_HEIGHT, 1280)
         self.assertEqual(Config.MAP_WIDTH, 850)
-        self.assertEqual(Config.MAP_HEIGHT, 550)
+        self.assertEqual(Config.MAP_HEIGHT, 570)
         self.assertEqual(Config.QR_SIZE, 160)
 
     def test_is_ad_mode_returns_bool(self):
@@ -99,6 +99,7 @@ class TestIntegration(unittest.TestCase):
         valid_strings = [
             "Nöbet: 24 Saat",
             "Nöbet: 13:00 - 08:45",
+            "Nöbet: 13:00 - 08:55",
             "Nöbet: 16:00 - 08:55",
             "Nöbet: 18:45 - 08:45",
         ]
