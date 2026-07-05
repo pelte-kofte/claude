@@ -303,16 +303,16 @@ class RoundedCoverMapLabel(QLabel):
 
         if hasattr(self, '_rota_text') and self._rota_text:
             painter.setPen(QColor(255, 255, 255, 100))
-            painter.setFont(QFont('Geist', 8))
+            painter.setFont(QFont('Plus Jakarta Sans', 8))
             painter.drawText(20, self.height() - 38, "ROTA")
 
             painter.setPen(QColor(255, 255, 255, 220))
-            painter.setFont(QFont('Geist', 13))
+            painter.setFont(QFont('Plus Jakarta Sans', 13))
             painter.drawText(20, self.height() - 16, self._rota_text)
 
         if hasattr(self, '_info_text') and self._info_text:
             painter.setPen(QColor(255, 255, 255, 180))
-            painter.setFont(QFont('Geist', 11))
+            painter.setFont(QFont('Plus Jakarta Sans', 11))
             metrics = painter.fontMetrics()
             text_width = metrics.horizontalAdvance(self._info_text)
             painter.drawText(self.width() - text_width - 20, self.height() - 16, self._info_text)
@@ -524,7 +524,7 @@ class ModernCorporateEczaneApp(QMainWindow):
     def create_fallback_icon(self, emoji, color="#ffffff", size=20):
         """🔄 FALLBACK EMOJI İKON"""
         label = QLabel(emoji)
-        label.setFont(QFont('Geist', size-4))
+        label.setFont(QFont('Plus Jakarta Sans', size-4))
         label.setStyleSheet(f"color: {color}; background: transparent;")
         label.setFixedSize(size, size)
         label.setAlignment(Qt.AlignCenter)
@@ -549,7 +549,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         widget.setStyleSheet(f"""
             QWidget {{
                 background-color: {self.colors['bg_primary']};
-                font-family: 'Geist', 'Helvetica Neue', sans-serif;
+                font-family: 'Plus Jakarta Sans', 'Helvetica Neue', sans-serif;
                 color: {self.colors['text_primary']};
                 border: none;
             }}
@@ -645,12 +645,12 @@ class ModernCorporateEczaneApp(QMainWindow):
         title_layout.setContentsMargins(0, 0, 0, 0)
         
         main_title = QLabel("KARŞIYAKA 4")
-        main_title.setFont(QFont('Geist', 26, QFont.Normal))
+        main_title.setFont(QFont('Plus Jakarta Sans', 26, QFont.Normal))
         main_title.setStyleSheet("color: white; background: transparent;")
         title_layout.addWidget(main_title)
         
         sub_title = QLabel("Nöbetçi Eczane Sistemi")
-        sub_title.setFont(QFont('Geist', 13, QFont.Normal))
+        sub_title.setFont(QFont('Plus Jakarta Sans', 13, QFont.Normal))
         sub_title.setStyleSheet("color: rgba(255, 255, 255, 0.9); background: transparent;")
         title_layout.addWidget(sub_title)
         
@@ -673,17 +673,17 @@ class ModernCorporateEczaneApp(QMainWindow):
         datetime_row_layout.addStretch()
         
         self.time_display = QLabel()
-        self.time_display.setFont(QFont('Geist', 18, QFont.Normal))
+        self.time_display.setFont(QFont('Plus Jakarta Sans', 18, QFont.Normal))
         self.time_display.setStyleSheet("color: white; background: transparent;")
         datetime_row_layout.addWidget(self.time_display)
         
         bullet = QLabel("•")
-        bullet.setFont(QFont('Geist', 18, QFont.Normal))
+        bullet.setFont(QFont('Plus Jakarta Sans', 18, QFont.Normal))
         bullet.setStyleSheet("color: rgba(255, 255, 255, 0.8); background: transparent; padding-bottom: 1px;")
         datetime_row_layout.addWidget(bullet)
         
         self.date_display = QLabel()
-        self.date_display.setFont(QFont('Geist', 18, QFont.Normal))
+        self.date_display.setFont(QFont('Plus Jakarta Sans', 18, QFont.Normal))
         self.date_display.setStyleSheet("color: rgba(255, 255, 255, 0.9); background: transparent;")
         datetime_row_layout.addWidget(self.date_display)
         
@@ -701,12 +701,12 @@ class ModernCorporateEczaneApp(QMainWindow):
         weather_row_layout.addWidget(self.lottie_widget)
         
         self.weather_temp = QLabel("--°C")
-        self.weather_temp.setFont(QFont('Geist', 16, QFont.Normal))
+        self.weather_temp.setFont(QFont('Plus Jakarta Sans', 16, QFont.Normal))
         self.weather_temp.setStyleSheet("color: white; background: transparent; none;")
         weather_row_layout.addWidget(self.weather_temp)
         
         self.weather_icon = QLabel("☀")
-        self.weather_icon.setFont(QFont('Geist', 16))
+        self.weather_icon.setFont(QFont('Plus Jakarta Sans', 16))
         self.weather_icon.setStyleSheet("color: white; background: transparent;")
         self.weather_icon.hide()
         weather_row_layout.addWidget(self.weather_icon)
@@ -734,7 +734,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         info_layout.setSpacing(20)
         
         title = QLabel("NÖBETÇİ ECZANE BİLGİLERİ")
-        title.setFont(QFont('Geist', 20, QFont.Normal))
+        title.setFont(QFont('Plus Jakarta Sans', 20, QFont.Normal))
         title.setStyleSheet(f"""
             color: {self.colors['text_primary']};
             background-color: {self.colors['bg_accent']};
@@ -770,7 +770,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.info_widget_layout.setSpacing(16)
         
         loading_label = QLabel("⏳ Yükleniyor...")
-        loading_label.setFont(QFont('Geist', 16))
+        loading_label.setFont(QFont('Plus Jakarta Sans', 16))
         loading_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
         loading_label.setAlignment(Qt.AlignCenter)
         self.info_widget_layout.addWidget(loading_label)
@@ -798,7 +798,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         qr_widget_layout.setContentsMargins(0, 0, 0, 0)
         
         qr_title = QLabel("YOL TARİFİ İÇİN\nQR OKUTUNUZ")
-        qr_title.setFont(QFont('Geist', 12, QFont.Normal))
+        qr_title.setFont(QFont('Plus Jakarta Sans', 12, QFont.Normal))
         qr_title.setAlignment(Qt.AlignCenter)
         qr_title.setStyleSheet(f"color: {self.colors['text_secondary']}; background: transparent; padding: 8px;")
         qr_widget_layout.addWidget(qr_title)
@@ -845,7 +845,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         
         # ECZANE ADI
         name_label = QLabel(name)
-        name_label.setFont(QFont('Geist', 20, QFont.Normal))
+        name_label.setFont(QFont('Plus Jakarta Sans', 20, QFont.Normal))
         name_label.setStyleSheet(f"color: {self.colors['text_primary']}; padding: 0px;")
         name_label.setWordWrap(True)
         self.info_widget_layout.addWidget(name_label)
@@ -884,7 +884,7 @@ class ModernCorporateEczaneApp(QMainWindow):
             row_layout.addWidget(fallback)
         
         label = QLabel(text)
-        label.setFont(QFont('Geist', 14))
+        label.setFont(QFont('Plus Jakarta Sans', 14))
         label.setStyleSheet(f"color: {self.colors['text_secondary']};")
         if wrap:
             label.setWordWrap(True)
@@ -932,14 +932,14 @@ class ModernCorporateEczaneApp(QMainWindow):
         footer_layout.setContentsMargins(0, 16, 0, 0)
         
         left_text = QLabel("Veriler İzmir Eczacıları Odası'ndan otomatik olarak güncellenmektedir.")
-        left_text.setFont(QFont('Geist', 11))
+        left_text.setFont(QFont('Plus Jakarta Sans', 11))
         left_text.setStyleSheet("color: rgba(255, 255, 255, 0.3); background: transparent;")
         footer_layout.addWidget(left_text)
         
         footer_layout.addStretch()
         
         right_text = QLabel("izmireczaciodasi.org.tr")
-        right_text.setFont(QFont('Geist', 11))
+        right_text.setFont(QFont('Plus Jakarta Sans', 11))
         right_text.setStyleSheet("color: rgba(255, 255, 255, 0.3); background: transparent;")
         footer_layout.addWidget(right_text)
         
@@ -958,10 +958,10 @@ class ModernCorporateEczaneApp(QMainWindow):
                         return
             
             self.logo_label.setText("🏥")
-            self.logo_label.setFont(QFont('Geist', 24))
+            self.logo_label.setFont(QFont('Plus Jakarta Sans', 24))
         except:
             self.logo_label.setText("🏥")
-            self.logo_label.setFont(QFont('Geist', 24))
+            self.logo_label.setFont(QFont('Plus Jakarta Sans', 24))
 
     def update_time(self):
         """Saat ve tarih güncelle"""
@@ -982,7 +982,7 @@ class ModernCorporateEczaneApp(QMainWindow):
 
         self.no_video_label = QLabel()
         self.no_video_label.setAlignment(Qt.AlignCenter)
-        self.no_video_label.setFont(QFont('Geist', 28, QFont.Normal))
+        self.no_video_label.setFont(QFont('Plus Jakarta Sans', 28, QFont.Normal))
         self.no_video_label.setStyleSheet(f"""
             background-color: {self.colors['bg_primary']};
             color: {self.colors['text_primary']};
@@ -1345,7 +1345,7 @@ Desteklenen formatlar:
                 widget.setParent(None)
         
         loading_label = QLabel("⏳ Nöbetçi eczane bilgileri yükleniyor...")
-        loading_label.setFont(QFont('Geist', 16))
+        loading_label.setFont(QFont('Plus Jakarta Sans', 16))
         loading_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
         loading_label.setAlignment(Qt.AlignCenter)
         self.info_widget_layout.addWidget(loading_label)
@@ -1358,7 +1358,7 @@ Desteklenen formatlar:
                 widget.setParent(None)
         
         error_label = QLabel("❌ KARŞIYAKA 4'te nöbetçi eczane bulunamadı")
-        error_label.setFont(QFont('Geist', 16))
+        error_label.setFont(QFont('Plus Jakarta Sans', 16))
         error_label.setStyleSheet(f"color: {self.colors['text_secondary']};")
         error_label.setAlignment(Qt.AlignCenter)
         self.info_widget_layout.addWidget(error_label)
@@ -1371,7 +1371,7 @@ Desteklenen formatlar:
                 widget.setParent(None)
         
         error_label = QLabel(f"❌ Bağlantı hatası:\n{error_msg}")
-        error_label.setFont(QFont('Geist', 14))
+        error_label.setFont(QFont('Plus Jakarta Sans', 14))
         error_label.setStyleSheet(f"color: {self.colors['accent_red']};")
         error_label.setAlignment(Qt.AlignCenter)
         error_label.setWordWrap(True)
@@ -1479,7 +1479,22 @@ Desteklenen formatlar:
 # ============================================================================
 def main():
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+    import urllib.request
+    import zipfile
+
+    font_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts')
+    os.makedirs(font_dir, exist_ok=True)
+    font_path = os.path.join(font_dir, 'PlusJakartaSans.ttf')
+
+    if not os.path.exists(font_path):
+        url = "https://github.com/tokotype/PlusJakartaSans/raw/master/fonts/ttf/PlusJakartaSans-Regular.ttf"
+        urllib.request.urlretrieve(url, font_path)
+
     app = QApplication(sys.argv)
+
+    from PyQt5.QtGui import QFontDatabase
+    QFontDatabase.addApplicationFont(font_path)
     window = ModernCorporateEczaneApp()
     sys.exit(app.exec_())
 
