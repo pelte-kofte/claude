@@ -610,9 +610,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         header.setFixedHeight(140)
         header.setStyleSheet(f"""
             QWidget {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #8B0000, stop:0.25 #C0392B, stop:0.5 #E74C3C,
-                    stop:0.75 #C0392B, stop:1 #8B0000);
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #B71C1C, stop:0.5 #C62828, stop:1 #B71C1C);
                 border-radius: 16px;
             }}
         """)
