@@ -325,9 +325,7 @@ class ModernCorporateEczaneApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"{Config.TARGET_REGION} Nöbetçi Eczane")
-        
-        self.setFixedSize(Config.WINDOW_WIDTH, Config.WINDOW_HEIGHT)
-        
+
         # 🌐 LOCAL HTTP SERVER BAŞLAT
         self.start_local_server()
         
@@ -1496,6 +1494,7 @@ def main():
     from PyQt5.QtGui import QFontDatabase
     QFontDatabase.addApplicationFont(font_path)
     window = ModernCorporateEczaneApp()
+    window.showFullScreen()
     sys.exit(app.exec_())
 
 
