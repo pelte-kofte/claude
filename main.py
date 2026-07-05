@@ -351,6 +351,11 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.current_video_index = 0
         self.slide_timer = None
         self.card_row_horizontal_margin = 32
+
+        # 🖼️ Alt reklam önizleme slaytı
+        self.ad_preview_images = []
+        self.ad_preview_index = 0
+        self.ad_preview_timer = None
         
         # Worker thread referansları
         self.pharmacy_worker = None
@@ -591,6 +596,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.create_red_header_with_lottie(layout)
         self.create_svg_info_section(layout)
         self.create_corporate_qr_map_section(layout)
+        self.create_ad_preview_section(layout)
         self.create_corporate_footer(layout)
         
         spacer = QWidget()
@@ -916,6 +922,74 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.destination_label = QLabel("Nöbetçi Eczane")
         self.destination_label.hide()  # Gizli, sadece veri tutmak için
 
+    def create_ad_preview_section(self, layout):
+        """🖼️ Haritanın altında reklam görsellerinin alt kısmını gösteren slayt"""
+        ad_row = QWidget()
+        ad_row.setStyleSheet("background: transparent;")
+        ad_row_layout = QHBoxLayout(ad_row)
+        ad_row_layout.setContentsMargins(self.card_row_horizontal_margin, 0, self.card_row_horizontal_margin, 0)
+
+        self.ad_preview_label = QLabel()
+        self.ad_preview_label.setAlignment(Qt.AlignCenter)
+        self.ad_preview_label.setStyleSheet(f"""
+            background-color: {self.colors['bg_secondary']};
+            border-radius: 12px;
+        """)
+
+        # Diğer tüm widget'lardan arta kalan ekran yüksekliğini hesapla
+        screen_height = QApplication.desktop().screenGeometry().height()
+        header_height = 140
+        info_height = 400
+        map_height = Config.MAP_HEIGHT
+        footer_height = 50
+        spacer_height = 100
+        vertical_margins = 32 + 32
+        spacing_gaps = 24 * 5  # header, info, map, ad, footer, spacer arasındaki 5 boşluk
+        used_height = header_height + info_height + map_height + footer_height + spacer_height + vertical_margins + spacing_gaps
+        remaining_height = max(screen_height - used_height, 150)
+
+        self.ad_preview_label.setFixedHeight(remaining_height)
+        ad_row_layout.addWidget(self.ad_preview_label)
+        layout.addWidget(ad_row)
+
+        self.load_ad_preview_images()
+
+    def load_ad_preview_images(self):
+        """ads/ klasöründeki görselleri alfabetik sırayla yükle"""
+        ads_dir = "ads"
+        self.ad_preview_images = []
+
+        if not os.path.exists(ads_dir):
+            return
+
+        try:
+            for file in sorted(os.listdir(ads_dir)):
+                if file.lower().endswith(('.png', '.jpg')):
+                    self.ad_preview_images.append(os.path.join(ads_dir, file))
+        except OSError:
+            return
+
+    def show_next_ad_preview(self):
+        """🖼️ Sıradaki reklam görselinin alt kısmını göster"""
+        if not self.ad_preview_images:
+            return
+
+        idx = self.ad_preview_index % len(self.ad_preview_images)
+        image_path = self.ad_preview_images[idx]
+
+        pixmap = QPixmap(image_path)
+        if not pixmap.isNull():
+            label_height = self.ad_preview_label.height()
+            label_width = self.ad_preview_label.width()
+            crop_height = int(pixmap.height() * 0.45)
+            cropped = pixmap.copy(0, pixmap.height() - crop_height, pixmap.width(), crop_height)
+            scaled = cropped.scaled(label_width, label_height, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+            x = (scaled.width() - label_width) // 2
+            y = (scaled.height() - label_height) // 2
+            self.ad_preview_label.setPixmap(scaled.copy(x, y, label_width, label_height))
+
+        self.ad_preview_index += 1
+
     def create_corporate_footer(self, layout):
         """🏢 FOOTER"""
         footer = QWidget()
@@ -1140,6 +1214,10 @@ Desteklenen formatlar:
         self.schedule_timer.timeout.connect(self.check_schedule_and_switch)
         self.schedule_timer.start(Config.MODE_CHECK_INTERVAL)
 
+        # Alt reklam önizleme slaytı
+        self.ad_preview_timer = QTimer()
+        self.ad_preview_timer.timeout.connect(self.show_next_ad_preview)
+
         print("⏰ Nöbet saatleri: Hafta içi 18:45-08:45, Cumartesi 16:00-08:55, Pazar tüm gün")
 
     def check_schedule_and_switch(self):
@@ -1154,6 +1232,9 @@ Desteklenen formatlar:
         """Video/slayt moduna geç"""
         self.current_mode = "video"
         self.stacked_widget.setCurrentWidget(self.video_widget)
+
+        if self.ad_preview_timer is not None:
+            self.ad_preview_timer.stop()
 
         if self.image_files:
             self.current_slide_index = 0
@@ -1182,6 +1263,10 @@ Desteklenen formatlar:
         self.stacked_widget.setCurrentWidget(self.pharmacy_widget)
         self.fetch_data()
         self.fetch_weather_data()
+
+        if self.ad_preview_timer is not None:
+            self.show_next_ad_preview()
+            self.ad_preview_timer.start(15000)
 
     # ========================================================================
     # 🔄 WORKER THREAD İLE VERİ ÇEKME - DONMA YOK!

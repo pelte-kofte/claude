@@ -38,7 +38,7 @@ class Config:
 
     # Harita ayarları (dikey ekran için)
     MAP_WIDTH = 850
-    MAP_HEIGHT = 570
+    MAP_HEIGHT = 520
 
     # QR kod ve slayt ayarları
     QR_SIZE = 160
