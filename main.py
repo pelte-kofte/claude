@@ -979,14 +979,13 @@ class ModernCorporateEczaneApp(QMainWindow):
 
         pixmap = QPixmap(image_path)
         if not pixmap.isNull():
-            label_height = self.ad_preview_label.height()
-            label_width = self.ad_preview_label.width()
-            crop_height = int(pixmap.height() * 0.45)
-            cropped = pixmap.copy(0, pixmap.height() - crop_height, pixmap.width(), crop_height)
-            scaled = cropped.scaled(label_width, label_height, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-            x = (scaled.width() - label_width) // 2
-            y = (scaled.height() - label_height) // 2
-            self.ad_preview_label.setPixmap(scaled.copy(x, y, label_width, label_height))
+            scaled = pixmap.scaled(
+                self.ad_preview_label.width(),
+                self.ad_preview_label.height(),
+                Qt.IgnoreAspectRatio,
+                Qt.SmoothTransformation
+            )
+            self.ad_preview_label.setPixmap(scaled)
 
         self.ad_preview_index += 1
 
