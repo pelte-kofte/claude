@@ -318,6 +318,27 @@ class RoundedCoverMapLabel(QLabel):
             painter.drawText(self.width() - text_width - 20, self.height() - 16, self._info_text)
 
 
+class RoundedPreviewLabel(QLabel):
+    """Label that clips its pixmap to rounded corners, like RoundedCoverMapLabel but without the overlay text."""
+
+    def __init__(self, *args, corner_radius=12, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._corner_radius = corner_radius
+
+    def paintEvent(self, event):
+        pixmap = self.pixmap()
+        if not pixmap or pixmap.isNull():
+            super().paintEvent(event)
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), self._corner_radius, self._corner_radius)
+        painter.setClipPath(path)
+        painter.drawPixmap(0, 0, pixmap)
+
+
 # ============================================================================
 # 🏥 ANA UYGULAMA
 # ============================================================================
@@ -929,7 +950,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         ad_row_layout = QHBoxLayout(ad_row)
         ad_row_layout.setContentsMargins(self.card_row_horizontal_margin, 0, self.card_row_horizontal_margin, 0)
 
-        self.ad_preview_label = QLabel()
+        self.ad_preview_label = RoundedPreviewLabel()
         self.ad_preview_label.setAlignment(Qt.AlignCenter)
         self.ad_preview_label.setStyleSheet(f"""
             background-color: {self.colors['bg_secondary']};
