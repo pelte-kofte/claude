@@ -955,8 +955,8 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.load_ad_preview_images()
 
     def load_ad_preview_images(self):
-        """ads/ klasöründeki görselleri alfabetik sırayla yükle"""
-        ads_dir = "ads"
+        """ads_preview/ klasöründeki görselleri alfabetik sırayla yükle"""
+        ads_dir = "ads_preview"
         self.ad_preview_images = []
 
         if not os.path.exists(ads_dir):
