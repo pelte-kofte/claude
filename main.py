@@ -449,9 +449,11 @@ class ModernCorporateEczaneApp(QMainWindow):
         else:
             QTimer.singleShot(500, self.check_server_ready)
 
-    def setup_lottie_weather(self):
+    def setup_lottie_weather(self, parent):
         """🎬 LOTTIE SİSTEMİ"""
-        self.lottie_widget = QWebEngineView()
+        # Keep the underlying Qt/GLib object owned until it is reparented into
+        # the weather row's layout.
+        self.lottie_widget = QWebEngineView(parent)
         self.lottie_widget.setFixedSize(40, 40)
         
         self.lottie_widget.setStyleSheet("""
@@ -613,12 +615,24 @@ class ModernCorporateEczaneApp(QMainWindow):
         layout.setSpacing(24)
         layout.setContentsMargins(40, 32, 40, 0)
 
-        self.setup_lottie_weather()
+        self.setup_lottie_weather(content_widget)
         self.create_red_header_with_lottie(layout)
         self.create_svg_info_section(layout)
         self.create_corporate_qr_map_section(layout)
         self.create_ad_preview_section(layout)
         self.create_corporate_footer(layout)
+
+        # Harita için kalan yüksekliği hesapla (ad_preview artık sabit 380px, görseller esnemiyor)
+        screen_height = QApplication.desktop().screenGeometry().height()
+        header_height = 140
+        info_card_height = 400  # başlık dahil, kart tek parça sabit yükseklikte
+        ad_preview_height = 380
+        footer_height = 50
+        vertical_margins = 32 + 0  # layout.setContentsMargins üst/alt
+        spacing_gaps = 24 * 4  # header, info, map, ad, footer arasındaki 4 boşluk
+        used_height = header_height + info_card_height + ad_preview_height + footer_height + vertical_margins + spacing_gaps
+        map_remaining_height = max(screen_height - used_height, 150)
+        self.map_label.setFixedHeight(map_remaining_height)
 
         scroll_area.setWidget(content_widget)
         
@@ -867,16 +881,24 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.info_widget_layout.addWidget(name_label)
         
         # TELEFON
+        rows_container = QWidget()
+        rows_container.setStyleSheet("background: transparent;")
+        rows_layout = QVBoxLayout(rows_container)
+        rows_layout.setContentsMargins(0, 0, 0, 0)
+        rows_layout.setSpacing(18)
+
         phone_row, _ = self.create_info_row("icons/phone.svg", "📞", phone, self.colors['accent_blue'])
-        self.info_widget_layout.addWidget(phone_row)
+        rows_layout.addWidget(phone_row)
 
         # ADRES
         address_row, _ = self.create_info_row("icons/mappin.svg", "📍", address, self.colors['accent_red'], wrap=True)
-        self.info_widget_layout.addWidget(address_row)
+        rows_layout.addWidget(address_row)
 
         # MESAFE
         distance_row, self._distance_row_label = self.create_info_row("icons/navigation.svg", "🚗", "Mesafe: Hesaplanıyor...", self.colors['accent_green'])
-        self.info_widget_layout.addWidget(distance_row)
+        rows_layout.addWidget(distance_row)
+
+        self.info_widget_layout.addWidget(rows_container)
 
     def create_info_row(self, svg_path, fallback_emoji, text, color, wrap=False):
         """Bilgi satırı oluştur"""
@@ -884,6 +906,8 @@ class ModernCorporateEczaneApp(QMainWindow):
         row.setStyleSheet("background: transparent;")
         row_layout = QHBoxLayout(row)
         row_layout.setSpacing(12)
+        # Every info row uses the same vertical margin; inter-row spacing is
+        # controlled by rows_layout in create_svg_info_display.
         row_layout.setContentsMargins(0, 4, 0, 4)
         if wrap:
             row_layout.setAlignment(Qt.AlignTop)
@@ -945,18 +969,8 @@ class ModernCorporateEczaneApp(QMainWindow):
             border-radius: 12px;
         """)
 
-        # Diğer tüm widget'lardan arta kalan ekran yüksekliğini hesapla
-        screen_height = QApplication.desktop().screenGeometry().height()
-        header_height = 140
-        info_height = 400
-        map_height = Config.MAP_HEIGHT
-        footer_height = 50
-        vertical_margins = 32 + 0
-        spacing_gaps = 24 * 4  # header, info, map, ad, footer arasındaki 4 boşluk
-        used_height = header_height + info_height + map_height + footer_height + vertical_margins + spacing_gaps
-        remaining_height = max(screen_height - used_height, 150)
-
-        self.ad_preview_label.setFixedHeight(remaining_height)
+        # PNG görseller 900x380, oranı bozmamak için sabit yükseklik
+        self.ad_preview_label.setFixedHeight(380)
         ad_row_layout.addWidget(self.ad_preview_label)
         layout.addWidget(ad_row)
 
@@ -989,7 +1003,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         if not pixmap.isNull():
             scaled = pixmap.scaled(
                 self.ad_preview_label.width(),
-                self.ad_preview_label.height(),
+                380,
                 Qt.IgnoreAspectRatio,
                 Qt.SmoothTransformation
             )
@@ -1003,7 +1017,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         footer.setFixedHeight(50)
         footer.setStyleSheet(f"""
             background: transparent;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border: none;
         """)
         
         footer_layout = QHBoxLayout(footer)
@@ -1567,6 +1581,9 @@ Desteklenen formatlar:
 # 🚀 MAIN
 # ============================================================================
 def main():
+    os.environ['G_MESSAGES_DEBUG'] = ''
+    warnings.filterwarnings('ignore')
+
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
     import urllib.request
