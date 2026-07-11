@@ -371,7 +371,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.current_slide_index = 0
         self.current_video_index = 0
         self.slide_timer = None
-        self.card_row_horizontal_margin = 32
+        self.card_row_horizontal_margin = 24  # matches red header's content margins (see create_red_header_with_lottie)
 
         # 🖼️ Alt reklam önizleme slaytı
         self.ad_preview_images = []
@@ -611,20 +611,15 @@ class ModernCorporateEczaneApp(QMainWindow):
         content_widget.setMinimumHeight(1400)
         layout = QVBoxLayout(content_widget)
         layout.setSpacing(24)
-        layout.setContentsMargins(40, 32, 40, 32)
-        
+        layout.setContentsMargins(40, 32, 40, 0)
+
         self.setup_lottie_weather()
         self.create_red_header_with_lottie(layout)
         self.create_svg_info_section(layout)
         self.create_corporate_qr_map_section(layout)
         self.create_ad_preview_section(layout)
         self.create_corporate_footer(layout)
-        
-        spacer = QWidget()
-        spacer.setMinimumHeight(100)
-        spacer.setStyleSheet("background: transparent;")
-        layout.addWidget(spacer)
-        
+
         scroll_area.setWidget(content_widget)
         
         main_widget_layout = QVBoxLayout(widget)
@@ -853,9 +848,6 @@ class ModernCorporateEczaneApp(QMainWindow):
         info_layout.addWidget(content_row)
         layout.addWidget(info_container)
 
-    def get_nobet_saati(self):
-        return Config.get_nobet_saati_str()
-
     def create_svg_info_display(self, name, phone, address):
         """📱 BİLGİ DISPLAY"""
         # Mevcut widget'ları temizle
@@ -885,10 +877,6 @@ class ModernCorporateEczaneApp(QMainWindow):
         # MESAFE
         distance_row, self._distance_row_label = self.create_info_row("icons/navigation.svg", "🚗", "Mesafe: Hesaplanıyor...", self.colors['accent_green'])
         self.info_widget_layout.addWidget(distance_row)
-
-        # NÖBET SAATLERİ
-        time_row, _ = self.create_info_row("icons/time.svg", "⏱️", Config.get_nobet_saati_str(), self.colors['accent_purple'])
-        self.info_widget_layout.addWidget(time_row)
 
     def create_info_row(self, svg_path, fallback_emoji, text, color, wrap=False):
         """Bilgi satırı oluştur"""
@@ -963,10 +951,9 @@ class ModernCorporateEczaneApp(QMainWindow):
         info_height = 400
         map_height = Config.MAP_HEIGHT
         footer_height = 50
-        spacer_height = 100
-        vertical_margins = 32 + 32
-        spacing_gaps = 24 * 5  # header, info, map, ad, footer, spacer arasındaki 5 boşluk
-        used_height = header_height + info_height + map_height + footer_height + spacer_height + vertical_margins + spacing_gaps
+        vertical_margins = 32 + 0
+        spacing_gaps = 24 * 4  # header, info, map, ad, footer arasındaki 4 boşluk
+        used_height = header_height + info_height + map_height + footer_height + vertical_margins + spacing_gaps
         remaining_height = max(screen_height - used_height, 150)
 
         self.ad_preview_label.setFixedHeight(remaining_height)
@@ -1285,7 +1272,7 @@ Desteklenen formatlar:
         self.fetch_weather_data()
 
         if self.ad_preview_timer is not None:
-            self.show_next_ad_preview()
+            QTimer.singleShot(200, self.show_next_ad_preview)
             self.ad_preview_timer.start(15000)
 
     # ========================================================================
