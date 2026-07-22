@@ -1623,19 +1623,33 @@ def main():
 
     import urllib.request
     import zipfile
+    import socket
 
     font_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts')
     os.makedirs(font_dir, exist_ok=True)
     font_path = os.path.join(font_dir, 'PlusJakartaSans.ttf')
 
     if not os.path.exists(font_path):
-        url = "https://github.com/tokotype/PlusJakartaSans/raw/master/fonts/ttf/PlusJakartaSans-Regular.ttf"
-        urllib.request.urlretrieve(url, font_path)
+        try:
+            socket.setdefaulttimeout(10)
+            url = "https://github.com/tokotype/PlusJakartaSans/raw/master/fonts/ttf/PlusJakartaSans-Regular.ttf"
+            urllib.request.urlretrieve(url, font_path)
+        except Exception as e:
+            print(f"⚠️ Font indirilemedi ({e}), sistem varsayılan fontu kullanılacak")
+            # Yarım inmiş dosya kalmasın; bir sonraki açılışta tekrar denensin
+            if os.path.exists(font_path):
+                try:
+                    os.remove(font_path)
+                except OSError:
+                    pass
+        finally:
+            socket.setdefaulttimeout(None)
 
     app = QApplication(sys.argv)
 
     from PyQt5.QtGui import QFontDatabase
-    QFontDatabase.addApplicationFont(font_path)
+    if os.path.exists(font_path):
+        QFontDatabase.addApplicationFont(font_path)
     window = ModernCorporateEczaneApp()
     window.showFullScreen()
     sys.exit(app.exec_())
