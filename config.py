@@ -30,6 +30,7 @@ class Config:
     # Güncelleme aralıkları (milisaniye)
     PHARMACY_UPDATE_INTERVAL = 2 * 60 * 60 * 1000  # 2 saat
     WEATHER_UPDATE_INTERVAL = 15 * 60 * 1000        # 15 dakika
+    RETRY_INTERVAL = 60000                           # 60 saniye (fetch hatası sonrası)
     TIME_UPDATE_INTERVAL = 1000                      # 1 saniye
     MODE_CHECK_INTERVAL = 30_000                     # 30 saniye
 

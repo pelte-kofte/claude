@@ -382,6 +382,15 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.pharmacy_worker = None
         self.weather_worker = None
         self.map_worker = None
+
+        # İlk başarılı gösterimden sonra refresh sırasında ekran silinmesin
+        self.has_displayed_pharmacy_data = False
+        self.has_displayed_map = False
+
+        # 🔁 Fetch hatasında 60 saniyede bir yeniden dene (2 saatlik timer'ı bekleme)
+        self.retry_timer = QTimer()
+        self.retry_timer.setSingleShot(True)
+        self.retry_timer.timeout.connect(self.retry_failed_fetches)
         
         # 🎨 MODERN CORPORATE RENK PALETİ
         self.colors = {
@@ -1293,12 +1302,19 @@ Desteklenen formatlar:
     # 🔄 WORKER THREAD İLE VERİ ÇEKME - DONMA YOK!
     # ========================================================================
     
+    def retry_failed_fetches(self):
+        """🔁 Bağlantı hatası sonrası her şeyi yeniden dene"""
+        print("🔁 Bağlantı hatası sonrası yeniden deneniyor...")
+        self.fetch_data()
+        self.fetch_weather_data()
+
     def fetch_data(self):
         """📡 ECZANE VERİSİ ÇEK - WORKER THREAD"""
         print("📡 Eczane bilgileri güncelleniyor (background)...")
-        
-        # Loading göster
-        self.show_loading_state()
+
+        # Loading sadece ilk açılışta göster; refresh'te mevcut bilgi ekranda kalsın
+        if not self.has_displayed_pharmacy_data:
+            self.show_loading_state()
         
         # Worker thread başlat
         self.pharmacy_worker = DataFetchWorker("pharmacy")
@@ -1310,8 +1326,10 @@ Desteklenen formatlar:
         """✅ Eczane verisi geldi - UI güncelle"""
         if data.get('keep_current'):
             print("⚠️ Site erişilemedi, mevcut veri korunuyor")
+            self.retry_timer.start(Config.RETRY_INTERVAL)
             return
         if data.get('found'):
+            self.retry_timer.stop()
             name = data['name']
             if hasattr(self, 'destination_label'):
                     self.destination_label.setText(name)
@@ -1322,6 +1340,7 @@ Desteklenen formatlar:
             self.end_lon = data['end_lon']   
             # Önce mesafe/süre olmadan göster
             self.create_svg_info_display(name, phone, address)
+            self.has_displayed_pharmacy_data = True
 
             # QR kod oluştur
             if maps_url:
@@ -1339,9 +1358,11 @@ Desteklenen formatlar:
         if self.end_lat is None or self.end_lon is None:
             return
         
-        self.map_label.clear_map_pixmap()
-        self.map_label.setText("Harita yukleniyor...")
-        
+        # Loading sadece hiç harita gösterilmemişse; refresh'te eski harita kalsın
+        if not self.has_displayed_map:
+            self.map_label.clear_map_pixmap()
+            self.map_label.setText("Harita yukleniyor...")
+
         self.map_worker = DataFetchWorker(
             "map",
             api_key=self.api_key,
@@ -1361,7 +1382,10 @@ Desteklenen formatlar:
             if map_bytes:
                 pixmap = QPixmap()
                 if not pixmap.loadFromData(map_bytes):
-                    self.map_label.setText("❌ Harita yüklenemedi")
+                    self.retry_timer.start(Config.RETRY_INTERVAL)
+                    # Eski harita ekrandaysa koru, sadece hiç harita yoksa hata göster
+                    if not self.has_displayed_map:
+                        self.map_label.setText("❌ Harita yüklenemedi")
                     return
                 distance = data.get('distance', '~2 km')
                 duration = data.get('duration', '~5 dakika')
@@ -1369,11 +1393,15 @@ Desteklenen formatlar:
                 self.update_distance_duration(distance, duration)
                 self.map_label.setText("")
                 self.map_label.set_map_pixmap(pixmap)
-            
+                self.has_displayed_map = True
+                self.retry_timer.stop()
+
         except Exception as e:
             print(f"❌ Harita gösterme hatası: {e}")
-            self.map_label.clear_map_pixmap()
-            self.map_label.setText("❌ Harita yüklenemedi")
+            self.retry_timer.start(Config.RETRY_INTERVAL)
+            if not self.has_displayed_map:
+                self.map_label.clear_map_pixmap()
+                self.map_label.setText("❌ Harita yüklenemedi")
 
     def update_distance_duration(self, distance, duration):
         if hasattr(self, '_distance_row_label') and self._distance_row_label:
@@ -1387,6 +1415,10 @@ Desteklenen formatlar:
     def on_map_error(self, error_msg):
         """Harita hatası"""
         print(f"❌ {error_msg}")
+        self.retry_timer.start(Config.RETRY_INTERVAL)
+        if self.has_displayed_map:
+            # Eski harita ekranda kalsın
+            return
         self.map_label.clear_map_pixmap()
         self.map_label.setText("❌ Harita yüklenemedi")
         self.map_label.setStyleSheet(f"""
@@ -1438,7 +1470,10 @@ Desteklenen formatlar:
     def on_fetch_error(self, error_msg):
         """Genel fetch hatası"""
         print(f"❌ {error_msg}")
-        self.show_error_state(error_msg)
+        self.retry_timer.start(Config.RETRY_INTERVAL)
+        # Ekranda geçerli veri varsa silme, mevcut bilgi kalsın
+        if not self.has_displayed_pharmacy_data:
+            self.show_error_state(error_msg)
 
     def show_loading_state(self):
         """Loading durumu göster"""
