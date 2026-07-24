@@ -1651,6 +1651,12 @@ def main():
     if os.path.exists(font_path):
         QFontDatabase.addApplicationFont(font_path)
     window = ModernCorporateEczaneApp()
+
+    # 🖱️ Dijital tabela: fare imlecini tüm uygulamada gizle
+    from PyQt5.QtGui import QCursor
+    from PyQt5.QtCore import Qt
+    app.setOverrideCursor(QCursor(Qt.BlankCursor))
+
     window.showFullScreen()
     sys.exit(app.exec_())
 
