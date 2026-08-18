@@ -17,7 +17,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtMultimedia import *
 from PyQt5.QtMultimediaWidgets import *
-from PyQt5.QtSvg import QSvgWidget
+from PyQt5.QtSvg import QSvgWidget, QSvgRenderer
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 import threading
 from config import Config
@@ -544,16 +544,51 @@ class ModernCorporateEczaneApp(QMainWindow):
             print(f"❌ Lottie hatası: {e}")
             return False
 
-    def load_svg_icon(self, icon_path, size=24):
-        """🎨 SVG İkon Yükleyici"""
+    def load_svg_icon(self, icon_path, size=24, color=None):
+        """🎨 SVG İkon Yükleyici
+        - viewBox kare olmasa bile oranı bozmadan `size x size` alana sığdırır ve ortalar.
+        - SVG içeriğindeki `currentColor`'ı verilen tema rengiyle değiştirir
+          (QSvgWidget dış CSS'ten renk devralmadığı için currentColor tek başına
+          işlemez, siyaha düşer).
+        """
         try:
-            if os.path.exists(icon_path):
-                svg_widget = QSvgWidget(icon_path)
-                svg_widget.setFixedSize(size, size)
-                svg_widget.setStyleSheet("background: transparent;")
-                return svg_widget
-            return None
-        except:
+            if not os.path.exists(icon_path):
+                return None
+
+            with open(icon_path, 'r', encoding='utf-8') as f:
+                svg_data = f.read()
+
+            if color:
+                svg_data = svg_data.replace('currentColor', color)
+
+            svg_bytes = QByteArray(svg_data.encode('utf-8'))
+
+            renderer = QSvgRenderer(svg_bytes)
+            view_box = renderer.viewBoxF()
+            if view_box.isValid() and view_box.width() > 0 and view_box.height() > 0:
+                aspect = view_box.width() / view_box.height()
+            else:
+                aspect = 1.0
+
+            if aspect >= 1:
+                icon_w, icon_h = size, max(1, round(size / aspect))
+            else:
+                icon_w, icon_h = max(1, round(size * aspect)), size
+
+            svg_widget = QSvgWidget()
+            svg_widget.load(svg_bytes)
+            svg_widget.setFixedSize(icon_w, icon_h)
+            svg_widget.setStyleSheet("background: transparent;")
+
+            # Satır hizalamasını bozmamak için sabit size x size alana ortala
+            container = QWidget()
+            container.setFixedSize(size, size)
+            container.setStyleSheet("background: transparent;")
+            container_layout = QVBoxLayout(container)
+            container_layout.setContentsMargins(0, 0, 0, 0)
+            container_layout.addWidget(svg_widget, alignment=Qt.AlignCenter)
+            return container
+        except Exception:
             return None
 
     def create_fallback_icon(self, emoji, color="#ffffff", size=20):
@@ -634,7 +669,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         # Harita için kalan yüksekliği hesapla (ad_preview artık sabit 380px, görseller esnemiyor)
         screen_height = QApplication.desktop().screenGeometry().height()
         header_height = 140
-        info_card_height = 400  # başlık dahil, kart tek parça sabit yükseklikte
+        info_card_height = self.info_container.height()  # başlık dahil, kart tek parça sabit yükseklikte (QR içeriğine göre büyüyebilir)
         ad_preview_height = 380
         footer_height = 50
         vertical_margins = 32 + 0  # layout.setContentsMargins üst/alt
@@ -765,7 +800,6 @@ class ModernCorporateEczaneApp(QMainWindow):
     def create_svg_info_section(self, layout):
         """📋 INFO SECTION"""
         info_container = QWidget()
-        info_container.setFixedHeight(400)
         info_container.setStyleSheet(f"""
             background-color: {self.colors['bg_card']};
             border-radius: 12px;
@@ -868,6 +902,13 @@ class ModernCorporateEczaneApp(QMainWindow):
         content_row_layout.addWidget(qr_widget, 1)
         
         info_layout.addWidget(content_row)
+
+        # QR kod (sabit Config.QR_SIZE) + başlık + padding'in gerektirdiği minimum
+        # yüksekliği hesapla; kart bu içeriği kesmesin diye 400px tabana göre büyüsün.
+        self.info_container = info_container
+        info_layout.activate()
+        info_container.setFixedHeight(max(400, info_container.sizeHint().height()))
+
         layout.addWidget(info_container)
 
     def create_svg_info_display(self, name, phone, address):
@@ -920,7 +961,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         if wrap:
             row_layout.setAlignment(Qt.AlignTop)
         
-        icon = self.load_svg_icon(svg_path, size=18)
+        icon = self.load_svg_icon(svg_path, size=18, color=color)
         if icon:
             row_layout.addWidget(icon)
         else:
