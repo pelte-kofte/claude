@@ -271,9 +271,19 @@ class RoundedCoverMapLabel(QLabel):
         self._info_text = info_text
         self.update()
 
+    def _draw_card_border(self, painter):
+        painter.setClipping(False)
+        painter.setPen(QPen(QColor(255, 255, 255, 15), 1))
+        painter.setBrush(Qt.NoBrush)
+        border_rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        painter.drawRoundedRect(border_rect, self._corner_radius, self._corner_radius)
+
     def paintEvent(self, event):
         if not self._map_pixmap or self._map_pixmap.isNull():
             super().paintEvent(event)
+            border_painter = QPainter(self)
+            border_painter.setRenderHint(QPainter.Antialiasing)
+            self._draw_card_border(border_painter)
             return
 
         from PyQt5.QtGui import QLinearGradient
@@ -317,6 +327,8 @@ class RoundedCoverMapLabel(QLabel):
             text_width = metrics.horizontalAdvance(self._info_text)
             painter.drawText(self.width() - text_width - 20, self.height() - 16, self._info_text)
 
+        self._draw_card_border(painter)
+
 
 class RoundedPreviewLabel(QLabel):
     """Label that clips its pixmap to rounded corners, like RoundedCoverMapLabel but without the overlay text."""
@@ -325,10 +337,20 @@ class RoundedPreviewLabel(QLabel):
         super().__init__(*args, **kwargs)
         self._corner_radius = corner_radius
 
+    def _draw_card_border(self, painter):
+        painter.setClipping(False)
+        painter.setPen(QPen(QColor(255, 255, 255, 15), 1))
+        painter.setBrush(Qt.NoBrush)
+        border_rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        painter.drawRoundedRect(border_rect, self._corner_radius, self._corner_radius)
+
     def paintEvent(self, event):
         pixmap = self.pixmap()
         if not pixmap or pixmap.isNull():
             super().paintEvent(event)
+            border_painter = QPainter(self)
+            border_painter.setRenderHint(QPainter.Antialiasing)
+            self._draw_card_border(border_painter)
             return
 
         painter = QPainter(self)
@@ -337,6 +359,7 @@ class RoundedPreviewLabel(QLabel):
         path.addRoundedRect(QRectF(self.rect()), self._corner_radius, self._corner_radius)
         painter.setClipPath(path)
         painter.drawPixmap(0, 0, pixmap)
+        self._draw_card_border(painter)
 
 
 # ============================================================================
@@ -768,7 +791,8 @@ class ModernCorporateEczaneApp(QMainWindow):
         info_container.setFixedHeight(400)
         info_container.setStyleSheet(f"""
             background-color: {self.colors['bg_card']};
-            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
         """)
         
         info_layout = QVBoxLayout(info_container)
@@ -797,7 +821,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.info_widget.setStyleSheet("""
             QWidget#infoWidget {
                 background: #141414;
-                border: 0.5px solid #333333;
+                border: 1px solid rgba(255, 255, 255, 0.06);
                 border-radius: 12px;
             }
             QWidget#infoWidget > QWidget {
@@ -807,8 +831,9 @@ class ModernCorporateEczaneApp(QMainWindow):
                 border: none;
             }
         """)
-        
+
         self.info_widget_layout = QVBoxLayout(self.info_widget)
+        self.info_widget_layout.setContentsMargins(20, 20, 20, 20)
         self.info_widget_layout.setSpacing(16)
         
         loading_label = QLabel("⏳ Yükleniyor...")
@@ -825,7 +850,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         qr_widget.setStyleSheet("""
             QWidget#qrWidget {
                 background: #141414;
-                border: 0.5px solid #333333;
+                border: 1px solid rgba(255, 255, 255, 0.06);
                 border-radius: 12px;
             }
             QWidget#qrWidget > QWidget {
@@ -836,13 +861,13 @@ class ModernCorporateEczaneApp(QMainWindow):
             }
         """)
         qr_widget_layout = QVBoxLayout(qr_widget)
-        qr_widget_layout.setSpacing(12)
-        qr_widget_layout.setContentsMargins(0, 0, 0, 0)
-        
+        qr_widget_layout.setSpacing(16)
+        qr_widget_layout.setContentsMargins(20, 20, 20, 20)
+
         qr_title = QLabel("YOL TARİFİ İÇİN\nQR OKUTUNUZ")
         qr_title.setFont(QFont('Plus Jakarta Sans', 12, QFont.Normal))
         qr_title.setAlignment(Qt.AlignCenter)
-        qr_title.setStyleSheet(f"color: {self.colors['text_secondary']}; background: transparent; padding: 8px;")
+        qr_title.setStyleSheet(f"color: {self.colors['text_secondary']}; background: transparent;")
         qr_widget_layout.addWidget(qr_title)
         
         qr_container = QWidget()
@@ -1067,8 +1092,26 @@ class ModernCorporateEczaneApp(QMainWindow):
     def update_time(self):
         """Saat ve tarih güncelle"""
         now = datetime.now()
-        self.time_display.setText(now.strftime("%H:%M"))
-        self.date_display.setText(now.strftime("%d.%m.%Y"))
+        self._set_text_with_fade(self.time_display, now.strftime("%H:%M"))
+        self._set_text_with_fade(self.date_display, now.strftime("%d.%m.%Y"))
+
+    def _set_text_with_fade(self, label, new_text):
+        """Metin değiştiğinde yalnızca çok hafif bir opaklık geçişiyle güncelle"""
+        if label.text() == new_text:
+            return
+        label.setText(new_text)
+
+        effect = label.graphicsEffect()
+        if not isinstance(effect, QGraphicsOpacityEffect):
+            effect = QGraphicsOpacityEffect(label)
+            label.setGraphicsEffect(effect)
+
+        anim = QPropertyAnimation(effect, b"opacity", label)
+        anim.setDuration(150)
+        anim.setStartValue(0.4)
+        anim.setEndValue(1.0)
+        anim.setEasingCurve(QEasingCurve.OutCubic)
+        anim.start(QAbstractAnimation.DeleteWhenStopped)
 
     def setup_video_ui(self):
         """Video UI"""
