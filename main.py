@@ -271,19 +271,9 @@ class RoundedCoverMapLabel(QLabel):
         self._info_text = info_text
         self.update()
 
-    def _draw_card_border(self, painter):
-        painter.setClipping(False)
-        painter.setPen(QPen(QColor(255, 255, 255, 15), 1))
-        painter.setBrush(Qt.NoBrush)
-        border_rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
-        painter.drawRoundedRect(border_rect, self._corner_radius, self._corner_radius)
-
     def paintEvent(self, event):
         if not self._map_pixmap or self._map_pixmap.isNull():
             super().paintEvent(event)
-            border_painter = QPainter(self)
-            border_painter.setRenderHint(QPainter.Antialiasing)
-            self._draw_card_border(border_painter)
             return
 
         from PyQt5.QtGui import QLinearGradient
@@ -327,8 +317,6 @@ class RoundedCoverMapLabel(QLabel):
             text_width = metrics.horizontalAdvance(self._info_text)
             painter.drawText(self.width() - text_width - 20, self.height() - 16, self._info_text)
 
-        self._draw_card_border(painter)
-
 
 class RoundedPreviewLabel(QLabel):
     """Label that clips its pixmap to rounded corners, like RoundedCoverMapLabel but without the overlay text."""
@@ -337,20 +325,10 @@ class RoundedPreviewLabel(QLabel):
         super().__init__(*args, **kwargs)
         self._corner_radius = corner_radius
 
-    def _draw_card_border(self, painter):
-        painter.setClipping(False)
-        painter.setPen(QPen(QColor(255, 255, 255, 15), 1))
-        painter.setBrush(Qt.NoBrush)
-        border_rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
-        painter.drawRoundedRect(border_rect, self._corner_radius, self._corner_radius)
-
     def paintEvent(self, event):
         pixmap = self.pixmap()
         if not pixmap or pixmap.isNull():
             super().paintEvent(event)
-            border_painter = QPainter(self)
-            border_painter.setRenderHint(QPainter.Antialiasing)
-            self._draw_card_border(border_painter)
             return
 
         painter = QPainter(self)
@@ -359,7 +337,6 @@ class RoundedPreviewLabel(QLabel):
         path.addRoundedRect(QRectF(self.rect()), self._corner_radius, self._corner_radius)
         painter.setClipPath(path)
         painter.drawPixmap(0, 0, pixmap)
-        self._draw_card_border(painter)
 
 
 # ============================================================================
@@ -607,7 +584,7 @@ class ModernCorporateEczaneApp(QMainWindow):
         widget.setStyleSheet(f"""
             QWidget {{
                 background-color: {self.colors['bg_primary']};
-                font-family: 'Plus Jakarta Sans', 'Helvetica Neue', sans-serif;
+                font-family: 'Plus Jakarta Sans';
                 color: {self.colors['text_primary']};
                 border: none;
             }}
@@ -791,7 +768,6 @@ class ModernCorporateEczaneApp(QMainWindow):
         info_container.setFixedHeight(400)
         info_container.setStyleSheet(f"""
             background-color: {self.colors['bg_card']};
-            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 12px;
         """)
         
@@ -821,7 +797,6 @@ class ModernCorporateEczaneApp(QMainWindow):
         self.info_widget.setStyleSheet("""
             QWidget#infoWidget {
                 background: #141414;
-                border: 1px solid rgba(255, 255, 255, 0.06);
                 border-radius: 12px;
             }
             QWidget#infoWidget > QWidget {
@@ -850,7 +825,6 @@ class ModernCorporateEczaneApp(QMainWindow):
         qr_widget.setStyleSheet("""
             QWidget#qrWidget {
                 background: #141414;
-                border: 1px solid rgba(255, 255, 255, 0.06);
                 border-radius: 12px;
             }
             QWidget#qrWidget > QWidget {
