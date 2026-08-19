@@ -936,15 +936,15 @@ class ModernCorporateEczaneApp(QMainWindow):
         rows_layout.setContentsMargins(0, 0, 0, 0)
         rows_layout.setSpacing(18)
 
-        phone_row, _ = self.create_info_row("icons/phone.svg", "📞", phone, self.colors['accent_blue'])
+        phone_row, _ = self.create_info_row("icons/phone.svg", "📞", phone, self.colors['text_primary'])
         rows_layout.addWidget(phone_row)
 
         # ADRES
-        address_row, _ = self.create_info_row("icons/mappin.svg", "📍", address, self.colors['accent_red'], wrap=True)
+        address_row, _ = self.create_info_row("icons/mappin.svg", "📍", address, self.colors['text_primary'], wrap=True)
         rows_layout.addWidget(address_row)
 
         # MESAFE
-        distance_row, self._distance_row_label = self.create_info_row("icons/navigation.svg", "🚗", "Mesafe: Hesaplanıyor...", self.colors['accent_green'])
+        distance_row, self._distance_row_label = self.create_info_row("icons/navigation.svg", "🚗", "Mesafe: Hesaplanıyor...", self.colors['text_primary'])
         rows_layout.addWidget(distance_row)
 
         self.info_widget_layout.addWidget(rows_container)

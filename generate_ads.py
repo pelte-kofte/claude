@@ -228,25 +228,32 @@ def build_slide_html(slide, size, font_face_css, font_scale=1.0):
                 satır sayısı aynı kalsın diye satır yüksekliği/max-width de orantılı ayarlanır).
     """
     width, height = size
+    is_full = height >= 900
     accent = ACCENT_COLORS.get(slide["out"], DEFAULT_ACCENT)
     photo_src = photo_data_uri(slide["photo"])
 
-    title_size = round(64 * font_scale, 1)
-    body_size = round(22 * font_scale, 1)
-    category_size = round(15 * font_scale, 1)
-    tag_size = round(15 * font_scale, 1)
+    if is_full:
+        title_size, title_weight, title_line_height = 88, 800, 1.02
+        body_size, body_weight, body_line_height = 25, 500, 1.4
+        category_size, tag_size, letter_spacing = 13, 13, "2px"
+        pad_left = 60
+    else:
+        title_size, title_weight, title_line_height = 38, 800, 1.05
+        body_size, body_weight, body_line_height = 17, 500, 1.3
+        category_size, tag_size, letter_spacing = 10, 10, "1px"
+        pad_left = 24
+
     footer_left_size = round(13 * font_scale, 1)
     brand_size = round(17 * font_scale, 1)
     sub_size = round(12 * font_scale, 1)
 
-    pad_h = round(56 * font_scale, 1)
     pad_top = round(48 * font_scale, 1)
     pad_bottom = round(40 * font_scale, 1)
     gap = round(10 * font_scale, 1)
 
-    # Alt koyu taban fotoğrafın alt %35-45'i; yarım boy düşük olduğu için
-    # oransal olarak biraz daha yüksek bir yüzdeye ihtiyaç duyar (metin bloğu sığsın diye).
-    scrim_height_pct = 42 if height >= 900 else 78
+    # Alt koyu taban fotoğrafın alt kısmı; büyütülmüş başlık/body daha fazla
+    # dikey yer kapladığı için bant da buna göre daha yüksek tutuluyor.
+    scrim_height_pct = 50 if is_full else 82
 
     html_content = f"""<!DOCTYPE html>
 <html>
@@ -269,33 +276,36 @@ body {{
     object-fit: cover; object-position: {slide['crop_focus']};
 }}
 .top-category {{
-    position: absolute; top: {pad_top}px; left: {pad_h}px;
-    font-weight: 600; font-size: {category_size}px; letter-spacing: 0.12em;
-    color: {accent};
+    position: absolute; top: {pad_top}px; left: {pad_left}px;
+    font-weight: 600; font-size: {category_size}px; letter-spacing: {letter_spacing};
+    color: {accent}; text-align: left;
     text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
 }}
 .bottom-scrim {{
     position: absolute; left: 0; right: 0; bottom: 0; height: {scrim_height_pct}%;
-    background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.75) 40%, rgba(0,0,0,0) 100%);
+    background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.75) 45%, rgba(0,0,0,0) 100%);
 }}
 .bottom-content {{
     position: absolute; left: 0; right: 0; bottom: 0;
-    padding: 0 {pad_h}px {pad_bottom}px;
+    padding: 0 0 {pad_bottom}px {pad_left}px;
 }}
 .tag {{
-    display: inline-block; font-weight: 600; font-size: {tag_size}px; letter-spacing: 0.1em;
-    color: {accent}; margin-bottom: {gap}px;
+    display: inline-block; font-weight: 600; font-size: {tag_size}px; letter-spacing: {letter_spacing};
+    color: {accent}; margin-bottom: {gap}px; text-align: left;
     text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
 }}
 .title {{
-    font-weight: 700; font-size: {title_size}px; line-height: 1.12; color: #ffffff;
-    margin-bottom: {gap}px;
+    font-weight: {title_weight}; font-size: {title_size}px; line-height: {title_line_height}; color: #ffffff;
+    width: 100%; max-width: 100%; text-align: left;
+    white-space: normal; word-wrap: normal; overflow-wrap: break-word;
+    margin: 0 0 {gap}px 0;
     text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
 }}
 .body {{
-    font-weight: 500; font-size: {body_size}px; line-height: 1.42; color: rgba(235,235,240,0.92);
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-    margin-bottom: {gap * 1.6}px;
+    font-weight: {body_weight}; font-size: {body_size}px; line-height: {body_line_height}; color: rgba(235,235,240,0.92);
+    width: 100%; max-width: 90%; text-align: left;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    margin: 0 0 {gap * 1.6}px 0;
     text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
 }}
 .divider {{
@@ -303,6 +313,7 @@ body {{
 }}
 .bottom-row {{
     display: flex; align-items: flex-end; justify-content: space-between;
+    padding-right: {pad_left}px;
 }}
 .footer-left {{
     font-weight: 600; font-size: {footer_left_size}px; letter-spacing: 0.08em; color: {accent};
